@@ -42,7 +42,7 @@ Prism is the **intelligence + guardrails + rail**, never the money layer.
 
 | Contract | Address |
 |---|---|
-| Prism Treasury | [`CCTMOZ5N…H3IW`](https://stellar.expert/explorer/testnet/contract/CCTMOZ5NTQEQ5DDVRANOPEVMT3FDVZE25LPV2S4QQIDPZFWV6OXSH3IW) |
+| Prism Treasury | [`CAYWNXHA…SPAZ`](https://stellar.expert/explorer/testnet/contract/CAYWNXHANRY5GSJAZOR4YTKBKNOKTCITE52ZRKDKCAWLDTYWFFVFSPAZ) |
 | USDC (SAC) | [`CDCEHPK4…3Y2W`](https://stellar.expert/explorer/testnet/contract/CDCEHPK4OJXVRA4JV7N56GR5SRD5KGGZ55BDSHKODGR72Y4KGS6A3Y2W) |
 | Funding pool | [`GD2NZKSM…3427`](https://stellar.expert/explorer/testnet/contract/GD2NZKSMQW367OIFXRM4NP7RIW6YLDZLJ4C7253MDOKCFC4Q4IOO3427) |
 | ERC-8004 Identity Registry | [`CDE3K4CO…FIWZH`](https://stellar.expert/explorer/testnet/contract/CDE3K4COIAGWNNJQQLL26SYI3KBJF5FUDHXG5FA6GYDJCG7T5V7FIWZH) (agent #1) |
@@ -76,7 +76,7 @@ Full details + verified results: [`DEPLOYMENT.md`](DEPLOYMENT.md).
                                                   └──────────────┬───────────────┘
                                                                  ▼  USDC transfer
                                                               VENDOR
-   trust layer:  ERC-8004 identity + reputation (trionlabs/stellar-8004)
+   trust layer:  ERC-8004 identity on-chain · reputation = next step  ·  trionlabs/stellar-8004
 ```
 
 ## Run it
@@ -101,7 +101,7 @@ human clicking approve.
 - **Contract:** Rust / `soroban-sdk` 26, Soroban testnet
 - **Client:** `stellar contract bindings typescript` → typed client
 - **Frontend:** Vite + React 19 + TypeScript, framer-motion, OKLCH spectral design system
-- **Trust:** ERC-8004 on Soroban (`@trionlabs/8004-sdk`)
+- **Trust:** ERC-8004 agent identity registered on-chain (trionlabs/stellar-8004 registries) — agent #1, verified in the dashboard. Reputation-gated payees are the documented next step.
 
 ## Structure
 

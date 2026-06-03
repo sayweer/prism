@@ -117,9 +117,11 @@ SDF'in kendi "Agents" hackathon temasıyla birebir örtüşüyor.
 
 Tüm adresler ve doğrulanan sonuçlar: [`../DEPLOYMENT.md`](../DEPLOYMENT.md).
 
-- **Prism Treasury:** `CCTMOZ5NTQEQ5DDVRANOPEVMT3FDVZE25LPV2S4QQIDPZFWV6OXSH3IW`
-- Doğrulandı: legit ödeme ✅, rogue → red #2 ✅, overlimit → red #3 ✅, per-task muhasebe ✅,
-  muxed deposit attribution ✅ — hepsi gerçek testnet tx'leriyle.
+- **Prism Treasury:** `CAYWNXHANRY5GSJAZOR4YTKBKNOKTCITE52ZRKDKCAWLDTYWFFVFSPAZ`
+- Doğrulandı (canlı testnet tx): legit ödeme ✅, rogue → red #2 ✅, per-task muhasebe ✅,
+  muxed deposit attribution ✅.
+- Per-task limit aşımı → red #3 (ExceedsTaskLimit) ve daily limit aşımı → red #4
+  (ExceedsDailyLimit) kontrat test paketinde kanıtlı — `cargo test` → 6/6.
 
 ---
 
