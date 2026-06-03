@@ -173,7 +173,7 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C3A6FF" strokeWidth="1.7"><circle cx="12" cy="12" r="8.5" /><path d="M12 7v5l3.5 2" strokeLinecap="round" strokeLinejoin="round" /></svg>
                   </div>
                   <h4>Daily limit</h4>
-                  <p>A rolling UTC-day ceiling auto-resets — runaway loops hit a wall.</p>
+                  <p>A daily UTC ceiling, reset every calendar day at 00:00 — runaway loops hit a wall.</p>
                 </div>
                 <div className="sat">
                   <div className="sat__ico">
