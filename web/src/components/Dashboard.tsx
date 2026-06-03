@@ -81,6 +81,13 @@ export default function Dashboard({ onHome }: { onHome: () => void }) {
   async function pay(task: AgentTask, rogue = false): Promise<PayResult> {
     setStatus((s) => ({ ...s, [task.taskId.toString()]: "running" }));
     const res = await agentPay(task.taskId, task.payee, task.amount);
+    // A transient hiccup (e.g. several judges submitting at once) is NOT a
+    // guardrail rejection — don't paint it red; reset and let them retry.
+    if (res.transient) {
+      setStatus((s) => ({ ...s, [task.taskId.toString()]: "idle" }));
+      setErr(res.errorMessage ?? "Network busy — tap “Run agent tasks” again in a moment.");
+      return res;
+    }
     setStatus((s) => ({ ...s, [task.taskId.toString()]: res.ok ? "ok" : "rej" }));
     setLedger((l) => [
       { key: `${task.taskId}-${l.length}`, name: task.name, payee: task.payee, amount: task.amount, ok: res.ok, hash: res.hash, error: res.errorMessage },
@@ -91,11 +98,15 @@ export default function Dashboard({ onHome }: { onHome: () => void }) {
   }
 
   async function runAgent() {
-    setBusy(true); setReject(null);
+    setBusy(true); setReject(null); setErr(null);
     for (const t of TASKS) {
       setStatus((s) => ({ ...s, [t.taskId.toString()]: "idle" }));
     }
-    for (const t of TASKS) { await pay(t); await wait(450); }
+    for (const t of TASKS) {
+      const r = await pay(t);
+      if (r.transient) break; // stop the run on a network hiccup; the user retries
+      await wait(450);
+    }
     await refresh();
     setBusy(false);
   }

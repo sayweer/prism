@@ -23,25 +23,52 @@ export function muxedFor(id: bigint): string {
   return new MuxedAccount(new Account(POOL_PK, "0"), id.toString()).accountId();
 }
 
-/** A client deposits XLM to a budget's muxed address (a real classic payment). */
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Several judges may fund at the same instant from the one demo funder account,
+ *  which collides on the account sequence. Detect that (and other transient
+ *  network errors) so we can retry with a freshly-loaded sequence. */
+function isTransientHorizon(e: unknown): boolean {
+  const tc = (e as { response?: { data?: { extras?: { result_codes?: { transaction?: string } } } } })
+    ?.response?.data?.extras?.result_codes?.transaction;
+  if (tc && /bad_seq|too_late|try_again/i.test(tc)) return true;
+  const msg = e instanceof Error ? e.message : String(e);
+  return /bad_seq|sequence|too late|timeout|429|50\d\b|network|fetch|econn|unavailable|temporar/i.test(msg);
+}
+
+/** A client deposits XLM to a budget's muxed address (a real classic payment).
+ *  Retries on stale-sequence / transient errors so concurrent funders don't fail. */
 export async function sendDeposit(id: bigint, amount = "5"): Promise<string> {
-  const src = await server.loadAccount(funder.publicKey());
-  const tx = new TransactionBuilder(src, {
-    fee: BASE_FEE,
-    networkPassphrase: NETWORK_PASSPHRASE,
-  })
-    .addOperation(
-      Operation.payment({
-        destination: muxedFor(id),
-        asset: Asset.native(),
-        amount,
-      }),
-    )
-    .setTimeout(60)
-    .build();
-  tx.sign(funder);
-  const res = await server.submitTransaction(tx);
-  return res.hash;
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const src = await server.loadAccount(funder.publicKey()); // fresh sequence each attempt
+      const tx = new TransactionBuilder(src, {
+        fee: BASE_FEE,
+        networkPassphrase: NETWORK_PASSPHRASE,
+      })
+        .addOperation(
+          Operation.payment({
+            destination: muxedFor(id),
+            asset: Asset.native(),
+            amount,
+          }),
+        )
+        .setTimeout(60)
+        .build();
+      tx.sign(funder);
+      const res = await server.submitTransaction(tx);
+      return res.hash;
+    } catch (e) {
+      lastErr = e;
+      if (attempt < 4 && isTransientHorizon(e)) {
+        await sleep(220 * (attempt + 1) + Math.floor(Math.random() * 400));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastErr;
 }
 
 export interface Deposit {

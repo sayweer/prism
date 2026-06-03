@@ -9,6 +9,7 @@ export default function FundingRail() {
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [fundErr, setFundErr] = useState<string | null>(null);
 
   async function refresh() {
     try { setDeposits(await readDeposits()); } catch { /* offline — ignore */ }
@@ -16,8 +17,9 @@ export default function FundingRail() {
   useEffect(() => { refresh(); }, []);
 
   async function fund(id: bigint) {
-    setBusy(id.toString());
-    try { await sendDeposit(id); await refresh(); } catch (e) { console.error(e); }
+    setBusy(id.toString()); setFundErr(null);
+    try { await sendDeposit(id); await refresh(); }
+    catch (e) { console.error(e); setFundErr("Network busy — try funding again in a moment."); }
     setBusy(null);
   }
 
@@ -87,6 +89,11 @@ export default function FundingRail() {
             );
           })}
         </div>
+        {fundErr && (
+          <p className="card__sub" style={{ marginTop: 14, textTransform: "none", letterSpacing: 0, color: "#FF8AA0", fontFamily: "var(--sans)", fontSize: 13 }}>
+            {fundErr}
+          </p>
+        )}
       </div>
 
       {/* RIGHT — last deposit + attributed list */}

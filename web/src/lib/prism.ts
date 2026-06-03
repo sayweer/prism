@@ -60,6 +60,34 @@ export interface PayResult {
   hash?: string;
   errorCode?: number;
   errorMessage?: string;
+  /** true = an infra/concurrency hiccup (e.g. many users submitting at once →
+   *  stale sequence), NOT a contract guardrail rejection. Safe to retry. */
+  transient?: boolean;
+}
+
+const MAX_TRIES = 5;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+function errText(e: unknown): string {
+  return e instanceof Error ? e.message : typeof e === "string" ? e : JSON.stringify(e);
+}
+
+/** A deterministic contract guardrail rejection (#1..#4). Never retried. */
+function contractError(msg: string): { errorCode: number; errorMessage: string } | null {
+  const m = msg.match(/Error\(Contract,\s*#?(\d+)\)/);
+  if (!m) return null;
+  const code = Number(m[1]);
+  const known = (Errors as Record<number, { message: string }>)[code];
+  return { errorCode: code, errorMessage: known?.message ?? `Contract error #${code}` };
+}
+
+/** Transient infra / concurrency errors — several judges submitting at the same
+ *  instant share one agent account, so a tx can land on a stale sequence. These
+ *  are safe to retry after re-fetching the sequence. */
+function isTransient(msg: string): boolean {
+  return /bad[_ ]?seq|sequence|tx_too_late|too[_ ]?late|timeout|timed out|deadline|429|too many|rate limit|50\d\b|service unavailable|temporar|unavailable|connection|network|fetch failed|failed to fetch|econn|reset by peer|try again/i.test(
+    msg,
+  );
 }
 
 export async function agentPay(
@@ -67,29 +95,29 @@ export async function agentPay(
   to: string,
   amount: bigint,
 ): Promise<PayResult> {
-  try {
-    const tx = await treasury.pay({ task_id: taskId, to, amount });
-    const sent = await tx.signAndSend();
-    const hash =
-      (sent as { sendTransactionResponse?: { hash?: string } })
-        .sendTransactionResponse?.hash;
-    return { ok: true, hash };
-  } catch (e) {
-    return { ok: false, ...parseContractError(e) };
+  let lastMsg = "";
+  for (let attempt = 0; attempt < MAX_TRIES; attempt++) {
+    try {
+      // pay() re-fetches the agent account (fresh sequence) on every attempt,
+      // so a retry after a concurrent submission picks up the new sequence.
+      const tx = await treasury.pay({ task_id: taskId, to, amount });
+      const sent = await tx.signAndSend();
+      const hash =
+        (sent as { sendTransactionResponse?: { hash?: string } })
+          .sendTransactionResponse?.hash;
+      return { ok: true, hash };
+    } catch (e) {
+      const msg = errText(e);
+      lastMsg = msg;
+      const ce = contractError(msg);
+      if (ce) return { ok: false, ...ce }; // real guardrail rejection — surface it
+      if (attempt < MAX_TRIES - 1 && isTransient(msg)) {
+        // back off with jitter so concurrent clients de-synchronise, then retry
+        await sleep(220 * (attempt + 1) + Math.floor(Math.random() * 400));
+        continue;
+      }
+      return { ok: false, transient: true, errorMessage: "Network busy — please try again" };
+    }
   }
-}
-
-function parseContractError(e: unknown): {
-  errorCode?: number;
-  errorMessage: string;
-} {
-  const msg =
-    e instanceof Error ? e.message : typeof e === "string" ? e : JSON.stringify(e);
-  const m = msg.match(/Error\(Contract,\s*#?(\d+)\)/) || msg.match(/#(\d+)/);
-  if (m) {
-    const code = Number(m[1]);
-    const known = (Errors as Record<number, { message: string }>)[code];
-    return { errorCode: code, errorMessage: known?.message ?? `Contract error #${code}` };
-  }
-  return { errorMessage: msg.slice(0, 160) };
+  return { ok: false, transient: true, errorMessage: lastMsg.slice(0, 120) || "Network busy" };
 }
