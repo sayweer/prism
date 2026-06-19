@@ -11,8 +11,9 @@
 ## Global Constraints
 
 - **Eligibility:** ZK must be load-bearing AND the project must touch Stellar (verify proofs in a Soroban contract). — copied from spec §1.
-- **Proving system:** Groth16 over **BLS12-381** only. Compile with `circom --prime bls12381`. — spec §3.
-- **On-chain verifier:** generated from our verifying key with `mysteryon88/soroban-verifier-gen` (BLS12-381 target); cross-reference `stellar/soroban-examples/groth16_verifier` for the host-function call pattern. — spec §3, §5.
+- **CURVE = BN254 (revised during execution).** This supersedes every "BLS12-381 / `--prime bls12381` / self-generated ptau" mention later in this plan. Reason: `circomlibjs` Poseidon is BN254-only, so off-chain hashes must be BN254 to match the circuit (spec §3 curve note).
+- **Proving system:** Groth16 over **BN254** (circom default prime — compile with `circom --prime bn128`, or no flag). Use the public **Hermez/PSE powers-of-tau** (`powersOfTau28_hez_final_*.ptau`); no self-generated ceremony.
+- **On-chain verifier:** generated from our verifying key with `mysteryon88/soroban-verifier-gen` (**`--curve bn254`**); Soroban verifies via `bn254_multi_pairing_check`. Cross-reference `stellar/soroban-examples/groth16_verifier` for the host-function call pattern only. — spec §3, §5.
 - **Batch size:** `N = 8`, fixed; unused slots padded with `amount = 0` to any whitelisted payee. — spec §4.
 - **Merkle depth:** `levels = 8` (whitelist up to 256 entries). Hash = Poseidon.
 - **Amount bound:** every amount range-bounded to **64 bits** via `Num2Bits(64)` before any comparison; every comparison enforced with `=== 1`. — spec §4 soundness footgun.

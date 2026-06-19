@@ -35,13 +35,16 @@ This is a textbook fit for the hackathon: the organizers' own idea list names "c
 
 ## 3. Toolchain decision (researched, fixed)
 
-**Circom + snarkjs (Groth16 over BLS12-381).** Rationale:
-- It is the only mainstream toolchain whose proof curve **natively matches** Soroban's BLS12-381 pairing host functions (`circom --prime bls12381`).
-- The on-chain verifier already exists as **official SDF code** to fork: [`stellar/soroban-examples/groth16_verifier`](https://github.com/stellar/soroban-examples/tree/main/groth16_verifier).
-- Range proofs + Merkle membership are standard `circomlib`.
-- **Off-chain fallback** is the same circuit + proofs verified via `snarkjs groth16 verify` — zero pipeline rework if the on-chain serialization slips.
+**Circom + snarkjs (Groth16 over BN254).** Rationale (revised during execution — see note):
+- **Poseidon parity (decisive):** off-chain proving and tests must compute the *exact* same Poseidon hashes as the circuit. `circomlibjs` is hardcoded to the **BN254** field; a BLS12-381-compiled circuit produces different hashes and breaks commitment/Merkle matching. BN254 keeps the canonical Tornado-style `circomlib`(circuit) ↔ `circomlibjs`(JS) parity.
+- **Existing trusted setup:** BN254 has a public powers-of-tau (Hermez/PSE) — no self-generated Phase-1 ceremony needed; BLS12-381 has none.
+- **Maturity:** BN254 is snarkjs's default Groth16 curve.
+- **On-chain verifiable on Soroban:** Soroban added BN254 host functions (`bn254_multi_pairing_check`, CAP-0074, Protocol 25 "X-Ray", the EIP-197 analogue), and `mysteryon88/soroban-verifier-gen` targets BN254. The official `stellar/soroban-examples/groth16_verifier` (BLS12-381) is kept as a **reference** for the host-call pattern only.
+- **Off-chain fallback** unchanged: same circuit + `snarkjs groth16 verify`.
 
-**Platform basis:** BLS12-381 host functions (CAP-0059, Protocol 22, mainnet Dec 2024); BN254 + Poseidon added later (Protocol 25 "X-Ray" / 26 "Yardstick"). A Groth16 verify costs ~40M instructions (~40% of the per-tx CPU budget), fits in one transaction, sub-cent fee. On-chain SNARK verification difficulty assessed at ~3–4/10 for this build.
+> **Curve note:** the original design specified BLS12-381; switched to BN254 during Task 2 setup once the circomlibjs Poseidon-field mismatch surfaced. BN254 is strictly better here (parity + existing PoT + native Soroban support).
+
+**Platform basis:** BN254 host functions (CAP-0074, Protocol 25 "X-Ray", mainnet Jan 2026) + Poseidon; BLS12-381 (CAP-0059, Protocol 22) available as the alternative. A Groth16 verify costs ~40M instructions (~40% of the per-tx CPU budget), fits in one transaction, sub-cent fee. On-chain SNARK verification difficulty assessed at ~3–4/10 for this build.
 
 **Reference repos:** `jamesbachini/CircomStellar` (snarkjs→Soroban byte encoder + testnet demo), `mysteryon88/soroban-verifier-gen` (auto-generates a curve-correct verifier crate from a `verification_key.json`), `stellar/soroban-examples/privacy-pools` (Groth16 + Poseidon + Merkle reference architecture), `erhant/circomkit` (dev harness).
 
