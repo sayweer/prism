@@ -1,0 +1,9 @@
+{
+  "protocol": "groth16",
+  "prime": "bn128",
+  "dirCircuits": "circuits",
+  "dirBuild": "build",
+  "dirPtau": "build/ptau",
+  "verbose": false,
+  "inspect": true
+}
