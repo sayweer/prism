@@ -26,6 +26,7 @@ A non-custodial Soroban treasury that lets a business hand an autonomous AI agen
 - **Account** — every payment is tracked per task in the contract, attributable with zero overhead.
 - **Fund** — earmark a budget per agent via zero-cost Stellar **muxed sub-addresses** — no memos, no new accounts.
 - **Live** — deployed on Stellar testnet, paying real USDC and rejecting real exploits. `cargo test` → **6/6**.
+- **Prove (ZK)** — confidential mode proves the agent stayed within policy in zero-knowledge, [verified on-chain](https://stellar.expert/explorer/testnet/tx/2019dd7956521d7e0a1942e4f7723825c583d3b90783972c7b920f33cc56c9b1), revealing no amount or payee.
 
 ## The problem
 
@@ -79,6 +80,27 @@ A prompt-injected "drain to attacker" payment is signed by the agent and still *
    trust layer:  ERC-8004 identity on-chain · reputation = next step  ·  trionlabs/stellar-8004
 ```
 
+## Confidential mode — same guarantees, zero disclosure (ZK)
+
+Prism's policy gate is transparent: today every `pay` reveals the payee and amount on-chain. **Prism Confidential** adds a zero-knowledge layer so a business can *prove its agent obeyed policy without revealing what it spent, on what, or with whom.*
+
+Each payment is hidden behind a commitment `C = Poseidon(amount, payee, salt)`. A single **Groth16 proof — verified on-chain by a Soroban contract** — attests over a batch that:
+
+```
+∀i  amount_i ≤ per-task limit        (range proof)
+    Σ amount_i ≤ daily limit         (aggregate bound)
+∀i  payee_i ∈ whitelist              (Poseidon Merkle membership)
+∀i  C_i = Poseidon(amount_i, payee_i, salt_i)   (commitment binding)
+```
+
+No amount or payee is ever revealed — only the commitments and the proof go on-chain. The contract runs the BN254 pairing check and emits `ComplianceAttested(whitelist_root, period_id)`. **Verified live on testnet:** [on-chain verify tx](https://stellar.expert/explorer/testnet/tx/2019dd7956521d7e0a1942e4f7723825c583d3b90783972c7b920f33cc56c9b1) · verifier [`CA3A7AOG…WS5B`](https://stellar.expert/explorer/testnet/contract/CA3A7AOGF5WHJ7CHFARBQ5W7G7VQ46KLXTCGIC7XBTYSGEESUIOSWS5B).
+
+- **Circuit** — Circom (BN254), `circomlib` Poseidon + Merkle + range proof. `npm test` in `circuits/` → **5/5**.
+- **On-chain verifier** — `soroban-verifier-gen --curve bn254`, wrapped with a raw-bytes ABI + attestation event. `cargo test -p compliance_verifier` → **2/2**.
+- **Proving** — snarkjs Groth16 over the public Hermez powers-of-tau; off-chain `snarkjs verify` is the documented fallback.
+
+> **Honesty note.** The ZK hides Prism's *compliance ledger* — Prism's storage and events carry only commitments and a proof, never plaintext amounts or payees. Transfer-level privacy (hiding the underlying USDC movement at the token layer) is the shielded-pool roadmap; for the demo, real fund movement is shown in the contrasting transparent "public mode".
+
 ## Why Stellar
 
 - **Sub-cent, deterministic fees** make agent micro-payments economical (gas would kill this).
@@ -124,17 +146,21 @@ The dashboard reads live testnet state, and the embedded agent key (testnet-only
 ## Project structure
 
 ```
-contracts/treasury/        Soroban bounded-treasury contract (+ 6 tests)
-packages/treasury-client/  generated TypeScript client
-web/                       landing + live dashboard (Vite · React 19 · TS)
-deck/                      pitch deck (self-contained spectral slides)
-DEPLOYMENT.md              live testnet addresses & verified results
-docs/                      narrative + assets
+contracts/treasury/             Soroban bounded-treasury contract (+ 6 tests)
+contracts/compliance_verifier/  on-chain BN254 Groth16 verifier (ZK) + attestation (+ 2 tests)
+circuits/                       Circom compliance circuit + circomkit tests + trusted setup
+packages/treasury-client/       generated TypeScript client
+packages/prover/                snarkjs → Soroban byte encoder + proof fixtures
+web/                            landing + live dashboard (Vite · React 19 · TS)
+deck/                           pitch deck (self-contained spectral slides)
+DEPLOYMENT.md                   live testnet addresses & verified results
+docs/                           narrative + assets, design spec & plan
 ```
 
 ## Tech stack
 
 - **Contract:** Rust / `soroban-sdk` 26 (Soroban, Stellar testnet)
+- **Confidential (ZK):** Circom + `circomlib` (BN254) · snarkjs Groth16 · on-chain verifier via `soroban-verifier-gen` (`bn254_multi_pairing_check`)
 - **Client:** `stellar contract bindings typescript` → typed client
 - **Frontend:** Vite + React 19 + TypeScript, framer-motion, OKLCH spectral design system
 - **Trust:** ERC-8004 agent identity registered on-chain ([trionlabs/stellar-8004](https://stellar.expert/explorer/testnet/contract/CDE3K4COIAGWNNJQQLL26SYI3KBJF5FUDHXG5FA6GYDJCG7T5V7FIWZH) registries) — agent #1, verified in the dashboard. Reputation-gated payees are the documented next step.
