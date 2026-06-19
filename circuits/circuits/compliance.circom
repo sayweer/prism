@@ -2,6 +2,7 @@ pragma circom 2.1.6;
 
 include "circomlib/circuits/comparators.circom";
 include "circomlib/circuits/bitify.circom";
+include "circomlib/circuits/poseidon.circom";
 
 // Prism Confidential — compliance predicate over a fixed batch of N payments.
 //
@@ -29,12 +30,20 @@ template Compliance(N, levels, nBits) {
     signal input pathElements[N][levels];  // used in Task 4
     signal input pathIndices[N][levels];   // used in Task 4
 
+    component commit[N];
     component rangeBits[N];
     component leCmp[N];
     signal sumTerms[N + 1];
     sumTerms[0] <== 0;
 
     for (var i = 0; i < N; i++) {
+        // commitment binding: C_i = Poseidon(amount_i, payee_i, salt_i).
+        commit[i] = Poseidon(3);
+        commit[i].inputs[0] <== amount[i];
+        commit[i].inputs[1] <== payee[i];
+        commit[i].inputs[2] <== salt[i];
+        commitments[i] === commit[i].out;
+
         // per-task range: bound the (adversary-controlled) amount BEFORE comparing.
         rangeBits[i] = Num2Bits(nBits);
         rangeBits[i].in <== amount[i];
