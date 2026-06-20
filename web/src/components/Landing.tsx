@@ -73,13 +73,6 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
             </motion.div>
           </div>
 
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 1.2, ease: EASE, delay: T.prism }}
-          >
-            <PrismMark variant="hero" />
-          </motion.div>
         </section>
 
         {/* ───────── stat console ───────── */}

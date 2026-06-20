@@ -391,3 +391,6 @@ button{ font-family:inherit; }
 .bg__aurora, .bg__fan { animation: none !important; }
 .bg__aurora { filter: blur(64px); }
 .bg__fan { filter: blur(30px); }
+
+/* hero prism removed (perf) → single column so there's no empty half */
+.hero { grid-template-columns: 1fr; }
