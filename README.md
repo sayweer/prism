@@ -26,7 +26,7 @@ A non-custodial Soroban treasury that lets a business hand an autonomous AI agen
 - **Account** — every payment is tracked per task in the contract, attributable with zero overhead.
 - **Fund** — earmark a budget per agent via zero-cost Stellar **muxed sub-addresses** — no memos, no new accounts.
 - **Trust + outcome** — pay any agent above an earned **reputation** threshold (not just a static whitelist), **escrow** funds for pay-on-delivery, and cap an agent's **x402** pay-per-use API spend.
-- **Prove (ZK)** — confidential mode proves the agent stayed within policy in zero-knowledge, [verified on-chain](https://stellar.expert/explorer/testnet/tx/2019dd7956521d7e0a1942e4f7723825c583d3b90783972c7b920f33cc56c9b1), revealing no amount or payee.
+- **Prove (ZK)** — confidential mode proves the agent stayed within policy in zero-knowledge, [verified on-chain](https://stellar.expert/explorer/testnet/tx/4438c94952d6d06fbf6b205e07be1c28ea33c5e1422a5323e93572788b9cac2a), revealing no amount or payee.
 - **Live** — deployed on Stellar testnet, paying real USDC and rejecting real exploits. `cargo test -p treasury` → **14/14**.
 
 ## The problem
@@ -96,10 +96,10 @@ Each payment is hidden behind a commitment `C = Poseidon(amount, payee, salt)`. 
 ∀i  C_i = Poseidon(amount_i, payee_i, salt_i)   (commitment binding)
 ```
 
-No amount or payee is ever revealed — only the commitments and the proof go on-chain. The contract runs the BN254 pairing check and emits `ComplianceAttested(whitelist_root, period_id)`. **Verified live on testnet:** [on-chain verify tx](https://stellar.expert/explorer/testnet/tx/2019dd7956521d7e0a1942e4f7723825c583d3b90783972c7b920f33cc56c9b1) · verifier [`CA3A7AOG…WS5B`](https://stellar.expert/explorer/testnet/contract/CA3A7AOGF5WHJ7CHFARBQ5W7G7VQ46KLXTCGIC7XBTYSGEESUIOSWS5B).
+No amount or payee is ever revealed — only the commitments and the proof go on-chain. The contract runs the BN254 pairing check and emits `ComplianceAttested(whitelist_root, period_id)`. **Verified live on testnet:** [on-chain verify tx](https://stellar.expert/explorer/testnet/tx/4438c94952d6d06fbf6b205e07be1c28ea33c5e1422a5323e93572788b9cac2a) · verifier [`CCOLX7NE…DBRH`](https://stellar.expert/explorer/testnet/contract/CCOLX7NEBDJRRVTPFVSK3UJLHMG3HO4UVYJW3NFBOTUG7Q7GOP63DBRH).
 
 - **Circuit** — Circom (BN254), `circomlib` Poseidon + Merkle + range proof. `npm test` in `circuits/` → **5/5**.
-- **On-chain verifier** — `soroban-verifier-gen --curve bn254`, wrapped with a raw-bytes ABI + attestation event. `cargo test -p compliance_verifier` → **2/2**.
+- **On-chain verifier** — `soroban-verifier-gen --curve bn254`, wrapped with a raw-bytes ABI + **anchored-policy binding + replay guard** + attestation event. `cargo test -p compliance_verifier` → **4/4**.
 - **Proving** — snarkjs Groth16 over the public Hermez powers-of-tau; off-chain `snarkjs verify` is the documented fallback.
 
 > **Honesty note.** The ZK hides Prism's *compliance ledger* — Prism's storage and events carry only commitments and a proof, never plaintext amounts or payees. Transfer-level privacy (hiding the underlying USDC movement at the token layer) is the shielded-pool roadmap; for the demo, real fund movement is shown in the contrasting transparent "public mode".
@@ -139,7 +139,7 @@ Three upgrades take Prism from a walled garden to the open agent economy — eac
 | Funding pool | [`GD2NZKSM…3427`](https://stellar.expert/explorer/testnet/contract/GD2NZKSMQW367OIFXRM4NP7RIW6YLDZLJ4C7253MDOKCFC4Q4IOO3427) |
 | ERC-8004 Identity Registry | [`CDE3K4CO…FIWZH`](https://stellar.expert/explorer/testnet/contract/CDE3K4COIAGWNNJQQLL26SYI3KBJF5FUDHXG5FA6GYDJCG7T5V7FIWZH) — agent #1 registered |
 | **Treasury v2** (reputation + escrow) | [`CDKQGDPL…XT5H`](https://stellar.expert/explorer/testnet/contract/CDKQGDPLRX6DOCQTI5KVMZNGMPKMSRNGJRVCQ7LAAQGB2S5JKDCHXT5H) |
-| **Compliance Verifier** (ZK) | [`CA3A7AOG…WS5B`](https://stellar.expert/explorer/testnet/contract/CA3A7AOGF5WHJ7CHFARBQ5W7G7VQ46KLXTCGIC7XBTYSGEESUIOSWS5B) |
+| **Compliance Verifier** (ZK) | [`CCOLX7NE…DBRH`](https://stellar.expert/explorer/testnet/contract/CCOLX7NEBDJRRVTPFVSK3UJLHMG3HO4UVYJW3NFBOTUG7Q7GOP63DBRH) |
 | Reputation Oracle (8004 stand-in) | [`CCJFIEYF…INKY`](https://stellar.expert/explorer/testnet/contract/CCJFIEYFNPRTJVCOGOSESYC5Z6FHHHYAH36V7QTZEDPKESY6O5TPINKY) |
 
 The first treasury is the transparent "public mode" demo; **Treasury v2** adds the reputation gate + escrow. Full addresses + verified on-chain results: [`DEPLOYMENT.md`](DEPLOYMENT.md).

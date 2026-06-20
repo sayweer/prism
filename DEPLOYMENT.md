@@ -17,7 +17,7 @@ Network: **Stellar Testnet** (`Test SDF Network ; September 2015`)
 | USDC (SAC, issuer=alice) | `CDCEHPK4OJXVRA4JV7N56GR5SRD5KGGZ55BDSHKODGR72Y4KGS6A3Y2W` |
 | **Prism Treasury** | `CAYWNXHANRY5GSJAZOR4YTKBKNOKTCITE52ZRKDKCAWLDTYWFFVFSPAZ` |
 | Treasury wasm hash | `41c8bb1f0b4d9bd7b89c3a855ee87cb56971a256fe110cd2860d406dde040c2b` |
-| **Compliance Verifier (ZK)** | `CA3A7AOGF5WHJ7CHFARBQ5W7G7VQ46KLXTCGIC7XBTYSGEESUIOSWS5B` |
+| **Compliance Verifier (ZK, hardened)** | `CCOLX7NEBDJRRVTPFVSK3UJLHMG3HO4UVYJW3NFBOTUG7Q7GOP63DBRH` |
 
 ## Policy (constructor)
 
@@ -46,13 +46,21 @@ committed whitelist — **without revealing any amount or payee**. Payments are 
 
 | Item | Value |
 |------|-------|
-| Compliance Verifier | `CA3A7AOGF5WHJ7CHFARBQ5W7G7VQ46KLXTCGIC7XBTYSGEESUIOSWS5B` |
-| Verifier wasm hash | `50b84c76d791106f68ccf88a41a753e962d635dc0ad3db5c003c2da741849844` |
-| **On-chain verify tx** | [`2019dd79…56c9b1`](https://stellar.expert/explorer/testnet/tx/2019dd7956521d7e0a1942e4f7723825c583d3b90783972c7b920f33cc56c9b1) → emitted `ComplianceAttested` |
+| Compliance Verifier (hardened) | `CCOLX7NEBDJRRVTPFVSK3UJLHMG3HO4UVYJW3NFBOTUG7Q7GOP63DBRH` |
+| Verifier wasm hash | `3afb9ef6ade22da54b7046f1dcb2a679a2dfd096d2de3dc863a3cd712e039c80` |
+| **On-chain verify tx** | [`4438c949…cac2a`](https://stellar.expert/explorer/testnet/tx/4438c94952d6d06fbf6b205e07be1c28ea33c5e1422a5323e93572788b9cac2a) → emitted `ComplianceAttested` |
+| **Replay rejected** | a 2nd verify of the same `periodId` traps (`already attested`) — replay guard live |
 
 Verified statement (public signals `[dailyLimit, perTaskLimit, whitelistRoot, periodId, commitments[8]]`).
+
+**Hardened (not just a math check).** The verifier anchors the owner's policy at deploy
+(`__constructor(admin, daily_limit, per_task_limit, whitelist_root)`) and `verify()` requires the
+proof's public `dailyLimit / perTaskLimit / whitelistRoot` to byte-match the anchor — so a valid
+proof for some *self-chosen* policy can no longer attest. Each `periodId` is consumed once
+(persistent guard), so a compliant proof can't be replayed to mask a later non-compliant period.
 The verify call emitted `attested = { whitelist_root, period_id }` on-chain. Circuit witness tests
-(`npm test` in `circuits/`) → **5/5**; contract tests (`cargo test -p compliance_verifier`) → **2/2**.
+(`npm test` in `circuits/`) → **5/5**; contract tests (`cargo test -p compliance_verifier`) → **4/4**
+(valid attest, tampered-proof trap, policy-mismatch trap, replay trap).
 
 **Honesty note.** The ZK layer hides Prism's *compliance ledger* — Prism's storage and events carry
 only commitments and a proof, never plaintext amounts or payees. If confidential mode also moves real
