@@ -1,0 +1,13 @@
+{
+  "name": "prism-x402",
+  "private": true,
+  "type": "module",
+  "description": "Bounded x402 buyer for Prism — gate an x402 payment against the treasury policy, then settle through the bounded treasury.",
+  "scripts": {
+    "test": "node --import tsx --test src/gate.test.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,0 +1,28 @@
+import type { GateResult, PaymentRequirements, TreasuryPolicy } from "./types.js";
+
+/**
+ * Decide whether an x402 payment is allowed under the treasury's policy — the
+ * "bounded x402" pre-flight. Mirrors the on-chain gate (asset, per-task limit,
+ * daily limit, payee whitelist OR reputation) so the agent never even attempts a
+ * payment the contract would reject. The on-chain `treasury.pay` is the final word.
+ */
+export function gateX402(req: PaymentRequirements, policy: TreasuryPolicy): GateResult {
+  const amount = BigInt(req.maxAmountRequired);
+
+  if (req.asset !== policy.token) {
+    return { allowed: false, amount, reason: "asset mismatch with treasury token" };
+  }
+  if (amount <= 0n) {
+    return { allowed: false, amount, reason: "non-positive amount" };
+  }
+  if (amount > policy.perTaskLimit) {
+    return { allowed: false, amount, reason: "exceeds per-task limit" };
+  }
+  if (policy.daySpent + amount > policy.dailyLimit) {
+    return { allowed: false, amount, reason: "exceeds daily limit" };
+  }
+  if (!policy.isAllowedPayee(req.payTo)) {
+    return { allowed: false, amount, reason: "payee not whitelisted and below reputation threshold" };
+  }
+  return { allowed: true, amount };
+}
