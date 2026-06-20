@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { Suspense, lazy, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Background from "./components/Background";
 import Landing from "./components/Landing";
-import Dashboard from "./components/Dashboard";
-import Wallet from "./components/Wallet";
+
+// Heavy views (they pull in the large @stellar/stellar-sdk) are code-split so the
+// landing loads fast — stellar-sdk only downloads when you open them.
+const Dashboard = lazy(() => import("./components/Dashboard"));
+const Wallet = lazy(() => import("./components/Wallet"));
 
 type View = "landing" | "dashboard" | "wallet";
 
@@ -29,39 +32,41 @@ export default function App() {
         </button>
       </nav>
 
-      <AnimatePresence mode="wait">
-        {view === "wallet" ? (
-          <motion.div
-            key="wallet"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <Wallet />
-          </motion.div>
-        ) : view === "landing" ? (
-          <motion.div
-            key="landing"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, y: -16 }}
-            transition={{ duration: 0.4, ease: [0.2, 0.7, 0.3, 1] }}
-          >
-            <Landing onLaunch={() => go("dashboard")} />
-          </motion.div>
-        ) : (
-          <motion.div
-            key="dashboard"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4, ease: [0.2, 0.7, 0.3, 1] }}
-          >
-            <Dashboard onHome={() => go("landing")} />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <Suspense fallback={null}>
+        <AnimatePresence mode="wait">
+          {view === "wallet" ? (
+            <motion.div
+              key="wallet"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <Wallet />
+            </motion.div>
+          ) : view === "landing" ? (
+            <motion.div
+              key="landing"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, y: -16 }}
+              transition={{ duration: 0.4, ease: [0.2, 0.7, 0.3, 1] }}
+            >
+              <Landing onLaunch={() => go("dashboard")} />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="dashboard"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.4, ease: [0.2, 0.7, 0.3, 1] }}
+            >
+              <Dashboard onHome={() => go("landing")} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </Suspense>
     </>
   );
 }
