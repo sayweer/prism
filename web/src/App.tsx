@@ -7,8 +7,9 @@ import Landing from "./components/Landing";
 // landing loads fast — stellar-sdk only downloads when you open them.
 const Dashboard = lazy(() => import("./components/Dashboard"));
 const Wallet = lazy(() => import("./components/Wallet"));
+const ActivityFeed = lazy(() => import("./components/ActivityFeed"));
 
-type View = "landing" | "dashboard" | "wallet";
+type View = "landing" | "dashboard" | "wallet" | "activity";
 
 export default function App() {
   const [view, setView] = useState<View>("landing");
@@ -24,11 +25,14 @@ export default function App() {
 
       {/* lightweight nav — switch between the agent demo and the user wallet flow */}
       <nav style={nav}>
-        <button style={navBtn(view !== "wallet")} onClick={() => go("landing")}>
+        <button style={navBtn(view === "landing" || view === "dashboard")} onClick={() => go("landing")}>
           Agent demo
         </button>
         <button style={navBtn(view === "wallet")} onClick={() => go("wallet")}>
           Wallet
+        </button>
+        <button style={navBtn(view === "activity")} onClick={() => go("activity")}>
+          Activity
         </button>
       </nav>
 
@@ -43,6 +47,16 @@ export default function App() {
               transition={{ duration: 0.3 }}
             >
               <Wallet />
+            </motion.div>
+          ) : view === "activity" ? (
+            <motion.div
+              key="activity"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <ActivityFeed />
             </motion.div>
           ) : view === "landing" ? (
             <motion.div

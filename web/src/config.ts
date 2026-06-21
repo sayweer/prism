@@ -9,6 +9,8 @@ export const HORIZON_URL = "https://horizon-testnet.stellar.org";
 export const EXPLORER = "https://stellar.expert/explorer/testnet";
 
 export const TREASURY_ID = "CAYWNXHANRY5GSJAZOR4YTKBKNOKTCITE52ZRKDKCAWLDTYWFFVFSPAZ";
+// Hardened ZK compliance verifier (policy binding + replay guard) — emits `attested`.
+export const VERIFIER_ID = "CCOLX7NEBDJRRVTPFVSK3UJLHMG3HO4UVYJW3NFBOTUG7Q7GOP63DBRH";
 export const USDC_SAC = "CDCEHPK4OJXVRA4JV7N56GR5SRD5KGGZ55BDSHKODGR72Y4KGS6A3Y2W";
 
 export const ADMIN = "GDPKXL6CNHUXBV4PM54CPTRZNQRYVTIMO4YGBW3M2MNSCMQ7TTNINXP6";
