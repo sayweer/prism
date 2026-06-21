@@ -161,6 +161,13 @@ The dashboard reads live testnet state, and the embedded agent key (testnet-only
 
 The **Wallet** tab (top-right nav) is a self-contained Stellar dApp — connect/disconnect **Freighter**, view your testnet **XLM balance**, and **send an XLM payment** with success/failure + tx-hash feedback. It's also the foundation of Prism's per-user login (*connect your wallet = your account*).
 
+### Screenshots — Wallet flow
+
+| Connected wallet · balance · confirmed payment | Payment successful on-chain |
+|:---:|:---:|
+| ![Wallet connected, XLM balance, and a confirmed testnet payment](docs/screenshots/01-wallet-send.png) | ![The payment, successful on Stellar Expert](docs/screenshots/02-tx-stellar-expert.png) |
+| Freighter connected (`G…TDQS`), balance shown, and *"Payment sent — confirmed on testnet ✓"*. | The same payment, **Status: Successful** on Stellar Expert (testnet). |
+
 ## Project structure
 
 ```
