@@ -53,11 +53,12 @@ export interface AgentTask {
   amount: bigint;
 }
 
-// The legitimate jobs the autonomous agent runs (all within policy limits).
+// The legitimate jobs the autonomous agent runs (all within policy limits) — the
+// real things an AI agent pays for: inference, data, and compute (pay-per-use).
 export const TASKS: AgentTask[] = [
-  { taskId: 101n, name: "GPT-4o summarization", vendor: "Inference API", payee: SERVICE, amount: 3n * USDC_UNIT },
-  { taskId: 102n, name: "Firecrawl web scrape", vendor: "Data API", payee: SERVICE, amount: 2n * USDC_UNIT },
-  { taskId: 103n, name: "Image generation x12", vendor: "Render API", payee: SERVICE, amount: 4n * USDC_UNIT },
+  { taskId: 101n, name: "LLM inference · 4.2M tokens", vendor: "Inference API", payee: SERVICE, amount: 3n * USDC_UNIT },
+  { taskId: 102n, name: "Real-time market data", vendor: "Data feed", payee: SERVICE, amount: 2n * USDC_UNIT },
+  { taskId: 103n, name: "GPU compute · 2.5 hrs", vendor: "Compute cloud", payee: SERVICE, amount: 4n * USDC_UNIT },
 ];
 
 // The prompt-injection / rogue scenario: agent told to send funds to an unapproved wallet.

@@ -73,8 +73,8 @@ function Reveal({
    rows reveal once on scroll-in (no churn). The blocked attempt is the punchline. ---- */
 type Row = { tag: string; tagcls?: string; h: string; s: string; amt: string; amtcls?: string };
 const LEDGER: Row[] = [
-  { tag: "usdc · pay", h: "GPT-4o summarization", s: "Inference API · task #101", amt: "3.00", amtcls: "ok" },
-  { tag: "usdc · pay", h: "Firecrawl web scrape", s: "Data API · task #102", amt: "2.00", amtcls: "ok" },
+  { tag: "usdc · pay", h: "LLM inference · 4.2M tokens", s: "Inference API · task #101", amt: "3.00", amtcls: "ok" },
+  { tag: "usdc · pay", h: "Real-time market data", s: "Data feed · task #102", amt: "2.00", amtcls: "ok" },
   { tag: "xlm · fund", tagcls: "tag--x", h: "Top-up · budget #1", s: "muxed deposit · no memo", amt: "+5.00" },
   { tag: "blocked", tagcls: "tag--no", h: "Drain → unknown wallet", s: "PayeeNotWhitelisted", amt: "0.00", amtcls: "no" },
 ];
