@@ -136,7 +136,7 @@ export default function FundingRail() {
             </div>
 
             {deposits.length > 1 && (
-              <div style={{ marginTop: 16 }}>
+              <div className="list-scroll" style={{ marginTop: 16, maxHeight: 220 }}>
                 {deposits.slice(1).map((d, i) => (
                   <div className="act" key={d.hash + i}>
                     <div className="act__ico act__ico--ok">
