@@ -426,13 +426,18 @@ export default function Dashboard({ onHome }: { onHome: () => void }) {
         </p>
 
         <div className="conf__commits">
-          {TASKS.map((t) => (
-            <div className="conf__row" key={t.taskId.toString()}>
-              <span className="conf__tag">task #{t.taskId.toString()}</span>
-              <span className="conf__hidden">amount •••• · payee ••••</span>
-              <span className="conf__commit mono">→ committed ✓</span>
-            </div>
-          ))}
+          {TASKS.map((t) => {
+            const committed = status[t.taskId.toString()] === "ok";
+            return (
+              <div className="conf__row" key={t.taskId.toString()}>
+                <span className="conf__tag">task #{t.taskId.toString()}</span>
+                <span className="conf__hidden">amount •••• · payee ••••</span>
+                <span className={`conf__commit mono ${committed ? "ok" : ""}`}>
+                  {committed ? "→ committed ✓" : "→ awaiting proof"}
+                </span>
+              </div>
+            );
+          })}
         </div>
 
         <div className="conf__proof">
