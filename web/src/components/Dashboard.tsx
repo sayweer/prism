@@ -452,9 +452,9 @@ export default function Dashboard({ onHome }: { onHome: () => void }) {
 
         <div className="conf__attest">
           <span className="badge badge--ok">◆ attested on-chain</span>
-          <a className="glow-link mono" href={txUrl(ATTESTED_TX)} target="_blank" rel="noreferrer">verify tx {shortAddr(ATTESTED_TX)} ↗</a>
+          <a className="glow-link mono" href={txUrl(ATTESTED_TX)} target="_blank" rel="noreferrer">reference verify tx {shortAddr(ATTESTED_TX)} ↗</a>
           <a className="glow-link mono" href={contractUrl(VERIFIER_ID)} target="_blank" rel="noreferrer">verifier {shortAddr(VERIFIER_ID)} ↗</a>
-          <span className="dim mono" style={{ fontSize: 12 }}>replay-guarded · re-verifying the period traps</span>
+          <span className="dim mono" style={{ fontSize: 12 }}>a real, replay-guarded attestation — shown as a reference; live per-run proving is the prover roadmap</span>
         </div>
       </motion.div>
 
