@@ -72,6 +72,31 @@ focuses on commitments + the on-chain-verified compliance proof.
 **Toolchain:** Circom + snarkjs (Groth16 / BN254), public Hermez powers-of-tau; on-chain verifier
 generated with `soroban-verifier-gen --curve bn254`, verified via Soroban's `bn254_multi_pairing_check`.
 
+## Confidential Token policy — OpenZeppelin `ComplianceHooks` (live on testnet)
+
+Prism's payee gate, packaged as an [OpenZeppelin + SDF Confidential Token](https://github.com/OpenZeppelin/stellar-contracts/tree/feat/confidential-verifier-ultrahonk)
+`Policy` (`is_authorized(account, token) -> bool`). Wire it as a confidential token's
+`compliance.policy` and every **private-amount** transfer is still bounded to authorized
+payees by Prism — whitelist OR earned reputation. *The confidential token hides the amount;
+Prism bounds the payee.*
+
+| Item | Value |
+|------|-------|
+| **Prism Policy** (ComplianceHooks) | `CBWMYGL7E663UON6ER5KQX2JZZA4UDZZD4RIFEHGXXF2HMMBRAN7BLQF` |
+| Deploy tx | [`8fb7f456…`](https://stellar.expert/explorer/testnet/tx/8fb7f45696f9d632596e960f61477654189dcc96f6af134843519958b9d13562) |
+| `is_authorized(service)` — whitelisted | `true` ✅ (live) |
+| `is_authorized(attacker)` — not whitelisted | `false` ✅ (live) |
+
+Wiring at the confidential token's construction:
+
+```rust
+ComplianceConfig { policy: Some(PRISM_POLICY), sac_passthrough: false }
+```
+
+Contract tests: `cargo test -p policy` → **2/2** (whitelist gate + reputation gate). The
+end-to-end POC against a deployed OZ Confidential Token is the next step (their preview
+needs Noir/UltraHonk + WSL2; tracked post-demo).
+
 ## Upgraded treasury v2 — reputation gate + escrow (live on testnet)
 
 Deployed fresh (the original demo treasury keeps its addresses) to prove the two
