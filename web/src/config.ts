@@ -11,6 +11,9 @@ export const EXPLORER = "https://stellar.expert/explorer/testnet";
 export const TREASURY_ID = "CAYWNXHANRY5GSJAZOR4YTKBKNOKTCITE52ZRKDKCAWLDTYWFFVFSPAZ";
 // Hardened ZK compliance verifier (policy binding + replay guard) — emits `attested`.
 export const VERIFIER_ID = "CCOLX7NEBDJRRVTPFVSK3UJLHMG3HO4UVYJW3NFBOTUG7Q7GOP63DBRH";
+// Live on-chain compliance attestation — the verify() tx that emitted `ComplianceAttested`.
+// A 2nd verify of the same periodId traps (replay guard), so this proof is shown, not re-run.
+export const ATTESTED_TX = "4438c94952d6d06fbf6b205e07be1c28ea33c5e1422a5323e93572788b9cac2a";
 export const USDC_SAC = "CDCEHPK4OJXVRA4JV7N56GR5SRD5KGGZ55BDSHKODGR72Y4KGS6A3Y2W";
 
 export const ADMIN = "GDPKXL6CNHUXBV4PM54CPTRZNQRYVTIMO4YGBW3M2MNSCMQ7TTNINXP6";

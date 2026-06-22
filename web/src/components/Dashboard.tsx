@@ -14,7 +14,7 @@ import {
 import {
   TASKS, ROGUE, fmtUSDC, shortAddr, txUrl, contractUrl,
   TREASURY_ID, USDC_SAC, AGENT_PK, REG_IDENTITY, AGENT_8004_ID,
-  SERVICE, ATTACKER, type AgentTask,
+  SERVICE, ATTACKER, VERIFIER_ID, ATTESTED_TX, type AgentTask,
 } from "../config";
 
 // preserve the brand mark import (used as the avatar fallback glyph below)
@@ -317,6 +317,7 @@ export default function Dashboard({ onHome }: { onHome: () => void }) {
             <div className="empty">No payments yet. Run the agent to watch it settle in real time.</div>
           )}
 
+          <div className="list-scroll">
           {ledger.map((r) => (
             r.ok ? (
               <div className="act" key={r.key}>
@@ -354,6 +355,7 @@ export default function Dashboard({ onHome }: { onHome: () => void }) {
               </div>
             )
           ))}
+          </div>
         </motion.div>
 
         {/* agent → payee minimap */}
@@ -408,6 +410,44 @@ export default function Dashboard({ onHome }: { onHome: () => void }) {
             </div>
           );
         })}
+      </motion.div>
+
+      {/* CONFIDENTIAL MODE — the ZK mirror of the public ledger above. Same payments,
+          zero disclosure: only commitments + a Groth16 proof, verified live on-chain. */}
+      <motion.div className="glass glass--violet card conf" style={{ marginTop: 22 }} {...up(0.42)}>
+        <div className="card__head">
+          <span className="card__title">Confidential mode · zero-knowledge</span>
+          <span className="badge badge--id">ZK · BN254 Groth16</span>
+        </div>
+        <p className="conf__lead">
+          The very same payments — proven inside policy <b>without revealing any amount or payee</b>.
+          Each is committed as <span className="mono">Poseidon(amount, payee, salt)</span>; only the
+          commitments and one proof go on-chain.
+        </p>
+
+        <div className="conf__commits">
+          {TASKS.map((t) => (
+            <div className="conf__row" key={t.taskId.toString()}>
+              <span className="conf__tag">task #{t.taskId.toString()}</span>
+              <span className="conf__hidden">amount •••• · payee ••••</span>
+              <span className="conf__commit mono">→ committed ✓</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="conf__proof">
+          <div className="conf__check"><span className="ok">✓ proven</span> each ≤ per-task limit (10 USDC)</div>
+          <div className="conf__check"><span className="ok">✓ proven</span> Σ ≤ daily limit (50 USDC)</div>
+          <div className="conf__check"><span className="ok">✓ proven</span> every payee ∈ committed whitelist</div>
+          <div className="conf__check"><span className="no">hidden</span> amount &amp; payee never disclosed</div>
+        </div>
+
+        <div className="conf__attest">
+          <span className="badge badge--ok">◆ attested on-chain</span>
+          <a className="glow-link mono" href={txUrl(ATTESTED_TX)} target="_blank" rel="noreferrer">verify tx {shortAddr(ATTESTED_TX)} ↗</a>
+          <a className="glow-link mono" href={contractUrl(VERIFIER_ID)} target="_blank" rel="noreferrer">verifier {shortAddr(VERIFIER_ID)} ↗</a>
+          <span className="dim mono" style={{ fontSize: 12 }}>replay-guarded · re-verifying the period traps</span>
+        </div>
       </motion.div>
 
       {/* FUNDING RAIL */}
