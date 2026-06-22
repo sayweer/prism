@@ -1,13 +1,30 @@
-import { Suspense, lazy, useState } from "react";
+import { Suspense, lazy, useState, type ComponentType } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Background from "./components/Background";
 import Landing from "./components/Landing";
 
 // Heavy views (they pull in the large @stellar/stellar-sdk) are code-split so the
 // landing loads fast — stellar-sdk only downloads when you open them.
-const Dashboard = lazy(() => import("./components/Dashboard"));
-const Wallet = lazy(() => import("./components/Wallet"));
-const ActivityFeed = lazy(() => import("./components/ActivityFeed"));
+// Recover from a stale lazy chunk after a deploy: an old cached index.html requests a
+// chunk hash that no longer exists (404) → instead of a black screen, reload once to
+// fetch the fresh index + correct chunks.
+const RELOAD_AT = "prism_chunk_reload_at";
+function lazyWithReload<T extends ComponentType<any>>(factory: () => Promise<{ default: T }>) {
+  return lazy(() =>
+    factory().catch(() => {
+      // Reload once to fetch a fresh index, but not more than once per 10s (loop guard).
+      const last = Number(sessionStorage.getItem(RELOAD_AT) || "0");
+      if (Date.now() - last > 10_000) {
+        sessionStorage.setItem(RELOAD_AT, String(Date.now()));
+        window.location.reload();
+      }
+      return new Promise<{ default: T }>(() => {}); // never resolves; the page is reloading
+    }),
+  );
+}
+const Dashboard = lazyWithReload(() => import("./components/Dashboard"));
+const Wallet = lazyWithReload(() => import("./components/Wallet"));
+const ActivityFeed = lazyWithReload(() => import("./components/ActivityFeed"));
 
 type View = "landing" | "dashboard" | "wallet" | "activity";
 
