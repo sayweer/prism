@@ -14,9 +14,9 @@
   --lx-line:  rgba(255,255,255,0.07);
   --lx-line2: rgba(255,255,255,0.13);
 
-  --lx-accent:     #00E0A4;       /* placeholder — final palette TBD by Bekir */
+  --lx-accent:     #FDDA24;       /* Stellar Yellow (official brand) */
   --lx-accent-dim: color-mix(in oklab, var(--lx-accent) 16%, transparent);
-  --lx-ink:        #04130e;
+  --lx-ink:        #0F0F0F;       /* Stellar Black — sits on the bright yellow */
   --lx-danger:     #FF4D5E;
 
   --lx-serif: 'Fraunces', Georgia, serif;
