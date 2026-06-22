@@ -23,18 +23,21 @@ export default function App() {
     <>
       <Background />
 
-      {/* lightweight nav — switch between the agent demo and the user wallet flow */}
-      <nav style={nav}>
-        <button style={navBtn(view === "landing" || view === "dashboard")} onClick={() => go("landing")}>
-          Agent demo
-        </button>
-        <button style={navBtn(view === "wallet")} onClick={() => go("wallet")}>
-          Wallet
-        </button>
-        <button style={navBtn(view === "activity")} onClick={() => go("activity")}>
-          Activity
-        </button>
-      </nav>
+      {/* App-level nav only on the inner views — the landing has its own floating
+          navbar (Wallet/Activity live there now), so this would just clutter it. */}
+      {view !== "landing" && (
+        <nav style={nav}>
+          <button style={navBtn(view === "dashboard")} onClick={() => go("landing")}>
+            Agent demo
+          </button>
+          <button style={navBtn(view === "wallet")} onClick={() => go("wallet")}>
+            Wallet
+          </button>
+          <button style={navBtn(view === "activity")} onClick={() => go("activity")}>
+            Activity
+          </button>
+        </nav>
+      )}
 
       <Suspense fallback={null}>
         <AnimatePresence mode="wait">
@@ -66,7 +69,11 @@ export default function App() {
               exit={{ opacity: 0, y: -16 }}
               transition={{ duration: 0.4, ease: [0.2, 0.7, 0.3, 1] }}
             >
-              <Landing onLaunch={() => go("dashboard")} />
+              <Landing
+                onLaunch={() => go("dashboard")}
+                onWallet={() => go("wallet")}
+                onActivity={() => go("activity")}
+              />
             </motion.div>
           ) : (
             <motion.div

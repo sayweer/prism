@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { type ReactNode } from "react";
+import { motion } from "framer-motion";
 import { TREASURY_ID, contractUrl } from "../config";
 import "./landing.css";
 
@@ -69,65 +69,43 @@ function Reveal({
   );
 }
 
-/* ---- live agent ledger: payments stream in, the blocked attempt stays pinned ---- */
+/* ---- agent ledger: the agent's recent on-chain activity. Static + meaningful;
+   rows reveal once on scroll-in (no churn). The blocked attempt is the punchline. ---- */
 type Row = { tag: string; tagcls?: string; h: string; s: string; amt: string; amtcls?: string };
-const FEED: Row[] = [
+const LEDGER: Row[] = [
   { tag: "usdc · pay", h: "GPT-4o summarization", s: "Inference API · task #101", amt: "3.00", amtcls: "ok" },
   { tag: "usdc · pay", h: "Firecrawl web scrape", s: "Data API · task #102", amt: "2.00", amtcls: "ok" },
-  { tag: "usdc · pay", h: "Image generation ×12", s: "Render API · task #103", amt: "4.00", amtcls: "ok" },
   { tag: "xlm · fund", tagcls: "tag--x", h: "Top-up · budget #1", s: "muxed deposit · no memo", amt: "+5.00" },
+  { tag: "blocked", tagcls: "tag--no", h: "Drain → unknown wallet", s: "PayeeNotWhitelisted", amt: "0.00", amtcls: "no" },
 ];
-const BLOCKED: Row = { tag: "blocked", tagcls: "tag--no", h: "Drain → unknown wallet", s: "PayeeNotWhitelisted", amt: "0.00", amtcls: "no" };
 
 function LiveLedger() {
-  const [rows, setRows] = useState(() => FEED.slice(0, 3).map((r, i) => ({ ...r, id: i })));
-  const counter = useRef(FEED.length);
-  const feedIdx = useRef(0);
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      feedIdx.current = (feedIdx.current + 1) % FEED.length;
-      const next = { ...FEED[feedIdx.current], id: counter.current++ };
-      setRows((prev) => [next, ...prev].slice(0, 3));
-    }, 2900);
-    return () => clearInterval(id);
-  }, []);
-
-  const PRow = (r: Row) => (
-    <div className="prow">
-      <span className={`tag ${r.tagcls ?? ""}`}>{r.tag}</span>
-      <span className="d">
-        <div className="h">{r.h}</div>
-        <div className="s">{r.s}</div>
-      </span>
-      <span className={`amt ${r.amtcls ?? ""}`}>{r.amt}</span>
-    </div>
-  );
-
   return (
     <Reveal delay={0.2}>
       <div className="proofcard">
         <div className="proofcard__bar">
-          <span className="t"><i /> Agent · live ledger</span>
+          <span className="t"><i /> Agent · recent activity</span>
           <span className="net">testnet</span>
         </div>
-        <div style={{ position: "relative" }}>
-          <AnimatePresence initial={false}>
-            {rows.map((r) => (
-              <motion.div
-                key={r.id}
-                layout
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.5, ease: EASE }}
-                style={{ overflow: "hidden" }}
-              >
-                {PRow(r)}
-              </motion.div>
-            ))}
-          </AnimatePresence>
-          {PRow(BLOCKED)}
+        <div>
+          {LEDGER.map((r, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, x: 16 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.55, ease: EASE, delay: 0.35 + i * 0.1 }}
+            >
+              <div className="prow">
+                <span className={`tag ${r.tagcls ?? ""}`}>{r.tag}</span>
+                <span className="d">
+                  <div className="h">{r.h}</div>
+                  <div className="s">{r.s}</div>
+                </span>
+                <span className={`amt ${r.amtcls ?? ""}`}>{r.amt}</span>
+              </div>
+            </motion.div>
+          ))}
         </div>
         <div className="proofcard__foot">
           <span>18 / 50 USDC today</span>
@@ -138,7 +116,15 @@ function LiveLedger() {
   );
 }
 
-export default function Landing({ onLaunch }: { onLaunch: () => void }) {
+export default function Landing({
+  onLaunch,
+  onWallet,
+  onActivity,
+}: {
+  onLaunch: () => void;
+  onWallet: () => void;
+  onActivity: () => void;
+}) {
   return (
     <div className="lx">
       {/* nav */}
@@ -147,6 +133,8 @@ export default function Landing({ onLaunch }: { onLaunch: () => void }) {
         <div className="links">
           <span className="live"><i /> Stellar Testnet</span>
           <a href="#how">How it works</a>
+          <button className="navlink" onClick={onWallet}>Wallet</button>
+          <button className="navlink" onClick={onActivity}>Activity</button>
           <a href="https://github.com/Bekirerdem/prism" target="_blank" rel="noreferrer">GitHub ↗</a>
         </div>
         <button className="navcta" onClick={onLaunch}>Launch demo</button>
