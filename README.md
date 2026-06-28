@@ -1,6 +1,8 @@
 <div align="center">
 
-# ◭ Prism
+<img src="docs/prism-logo.png" alt="Prism logo" width="120" />
+
+# Prism
 
 ### The wallet your AI agent can't drain.
 
