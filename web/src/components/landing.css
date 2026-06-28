@@ -70,7 +70,7 @@
   background:rgba(10,10,14,0.55); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); }
 .lx .nav .links{ margin-left:auto; }
 .lx .nav .brand{ display:flex; align-items:center; gap:11px; font-family:var(--lx-serif); font-weight:600; font-size:20px; }
-.lx .nav .glyph{ width:12px; height:12px; background:var(--lx-accent); transform:rotate(45deg); box-shadow:0 0 16px var(--lx-accent); }
+.lx .nav .glyph{ width:27px; height:27px; background:url('/favicon.png') center/cover no-repeat; border-radius:7px; box-shadow:0 2px 12px rgba(0,0,0,.45); }
 .lx .nav .links{ display:flex; align-items:center; gap:26px; font-size:13.5px; color:var(--lx-muted); }
 .lx .nav .links a:hover{ color:var(--lx-text); }
 .lx .nav .links .navlink{ background:none; border:none; padding:0; margin:0; font:inherit; font-size:13.5px; color:var(--lx-muted); cursor:pointer; transition:color .2s; }
@@ -194,7 +194,7 @@
 
 .lx .foot{ border-top:1px solid var(--lx-line); padding:34px 0 70px; display:flex; align-items:center; justify-content:space-between; gap:18px; flex-wrap:wrap; }
 .lx .foot .b{ display:flex; align-items:center; gap:11px; font-family:var(--lx-serif); font-weight:600; font-size:18px; }
-.lx .foot .b .glyph{ width:11px; height:11px; background:var(--lx-accent); transform:rotate(45deg); }
+.lx .foot .b .glyph{ width:24px; height:24px; background:url('/favicon.png') center/cover no-repeat; border-radius:6px; }
 .lx .foot .op{ font-family:var(--lx-mono); font-size:12px; color:var(--lx-dim); display:flex; align-items:center; gap:8px; }
 .lx .foot .op i{ width:6px; height:6px; border-radius:50%; background:var(--lx-accent); box-shadow:0 0 8px var(--lx-accent); }
 
