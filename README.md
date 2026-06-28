@@ -180,6 +180,14 @@ The **Wallet** tab (top-right nav) is a self-contained Stellar dApp — connect/
 
 ### Screenshots
 
+**The agent dashboard — an AI agent spent real money, safely** (treasury balance, per-task & daily limits, live on-chain settlement):
+
+![Agent demo dashboard — treasury balance, settled agent payments, daily-limit ring](docs/screenshots/09-dashboard.png)
+
+**Confidential mode · zero-knowledge** — every settled payment is proven inside policy without revealing any amount or payee (Poseidon commitments + on-chain BN254 attestation):
+
+![Confidential mode — commitments, proven per-task/daily bounds, on-chain attestation](docs/screenshots/08-confidential.png)
+
 **Multi-wallet connect — StellarWalletsKit** (Freighter · xBull · Albedo · LOBSTR · Rabet · Hana):
 
 ![Connect Wallet modal listing the available wallet options](docs/screenshots/03-wallet-options.png)
