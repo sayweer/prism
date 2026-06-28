@@ -81,6 +81,7 @@ export default function Wallet() {
         return;
       }
       setAddress(addr);
+      sessionStorage.setItem("prism_wallet_address", addr);
       setStatus({ kind: "idle", msg: "" });
       await loadBalance(addr);
     } catch (e) {
@@ -95,6 +96,7 @@ export default function Wallet() {
       /* ignore */
     }
     setAddress(null);
+    sessionStorage.removeItem("prism_wallet_address");
     setBalance(null);
     setDest("");
     setAmount("");
