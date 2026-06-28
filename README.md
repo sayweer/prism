@@ -12,7 +12,7 @@ A non-custodial Soroban treasury that lets a business hand an autonomous AI agen
 ![Tests](https://img.shields.io/badge/tests-treasury_14%2F14_·_circuit_5%2F5_·_verifier_4%2F4-FDDA24?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-3a3a3a?style=flat-square)
 
-**[▶ Live demo](https://web-five-psi-7iqrhfurdh.vercel.app) · [🎥 Demo video](https://youtu.be/R7mw9ZTh94U) · [🎤 Pitch deck](https://deck-bice-omega.vercel.app) · [🔗 Contract on Stellar Expert](https://stellar.expert/explorer/testnet/contract/CAYWNXHANRY5GSJAZOR4YTKBKNOKTCITE52ZRKDKCAWLDTYWFFVFSPAZ) · [📄 Deployment & proofs](DEPLOYMENT.md)**
+**[▶ Live demo](https://prism-stellar.vercel.app) · [🎥 Demo video](https://youtu.be/R7mw9ZTh94U) · [🎤 Pitch deck](https://deck-bice-omega.vercel.app) · [🔗 Contract on Stellar Expert](https://stellar.expert/explorer/testnet/contract/CAYWNXHANRY5GSJAZOR4YTKBKNOKTCITE52ZRKDKCAWLDTYWFFVFSPAZ) · [📄 Deployment & proofs](DEPLOYMENT.md)**
 
 <img src="docs/hero.png" alt="Prism — the wallet your AI agent can't drain" width="840" />
 
@@ -138,7 +138,7 @@ Three upgrades take Prism from a walled garden to the open agent economy — eac
 
 ## Try the live demo
 
-**→ [web-five-psi-7iqrhfurdh.vercel.app](https://web-five-psi-7iqrhfurdh.vercel.app)** (Stellar testnet, no wallet needed)
+**→ [prism-stellar.vercel.app](https://prism-stellar.vercel.app)** (Stellar testnet, no wallet needed)
 
 1. **Run agent tasks** — the agent autonomously settles 3 vendor payments in USDC. No wallet popup; it signs its own transactions. Each lands with a real Stellar Expert tx link.
 2. **Simulate prompt-injection** — tell the agent to send funds to an unapproved wallet. The contract **rejects it on-chain** (`PayeeNotWhitelisted`). Funds never move. 🔴
