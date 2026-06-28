@@ -2,6 +2,7 @@ import { Suspense, lazy, useState, type ComponentType } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Background from "./components/Background";
 import Landing from "./components/Landing";
+import FeedbackButton from "./components/FeedbackButton";
 
 // Heavy views (they pull in the large @stellar/stellar-sdk) are code-split so the
 // landing loads fast — stellar-sdk only downloads when you open them.
@@ -105,6 +106,7 @@ export default function App() {
           )}
         </AnimatePresence>
       </Suspense>
+      <FeedbackButton />
     </>
   );
 }
