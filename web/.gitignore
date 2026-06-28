@@ -24,3 +24,8 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# Local env — real keys never committed
+.env
+.env.*
+!.env.example
