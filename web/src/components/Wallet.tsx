@@ -5,52 +5,11 @@
 // balance. (Premium visual pass is a later phase with Gemini; this is the functional layer.)
 import { useCallback, useState } from "react";
 import { Asset, BASE_FEE, Horizon, Operation, TransactionBuilder } from "@stellar/stellar-sdk";
-import { StellarWalletsKit, Networks } from "@creit.tech/stellar-wallets-kit";
-import { FreighterModule, FREIGHTER_ID } from "@creit.tech/stellar-wallets-kit/modules/freighter";
-import { xBullModule } from "@creit.tech/stellar-wallets-kit/modules/xbull";
-import { AlbedoModule } from "@creit.tech/stellar-wallets-kit/modules/albedo";
-import { LobstrModule } from "@creit.tech/stellar-wallets-kit/modules/lobstr";
-import { RabetModule } from "@creit.tech/stellar-wallets-kit/modules/rabet";
-import { HanaModule } from "@creit.tech/stellar-wallets-kit/modules/hana";
 import { EXPLORER, HORIZON_URL, NETWORK_PASSPHRASE, shortAddr } from "../config";
 import { connectErr, sendErr } from "../lib/wallet-errors";
+import { kit, connect as kitConnect, disconnect as kitDisconnect } from "../lib/walletKit";
 
 const server = new Horizon.Server(HORIZON_URL);
-
-// One-time kit setup. `authModal()` lists these as the available "wallet options".
-StellarWalletsKit.init({
-  network: Networks.TESTNET,
-  selectedWalletId: FREIGHTER_ID,
-  modules: [
-    new FreighterModule(),
-    new xBullModule(),
-    new AlbedoModule(),
-    new LobstrModule(),
-    new RabetModule(),
-    new HanaModule(),
-  ],
-});
-
-// Theme the wallet-select modal to match Prism — dark surface + Stellar-yellow accent.
-StellarWalletsKit.setTheme({
-  "background": "#0b0b10",
-  "background-secondary": "#131319",
-  "foreground-strong": "#f3f1ec",
-  "foreground": "#e8e6df",
-  "foreground-secondary": "#94939c",
-  "primary": "#FDDA24",
-  "primary-foreground": "#0F0F0F",
-  "transparent": "transparent",
-  "lighter": "rgba(255,255,255,0.08)",
-  "light": "rgba(255,255,255,0.06)",
-  "light-gray": "rgba(255,255,255,0.12)",
-  "gray": "#56555f",
-  "danger": "#FF4D5E",
-  "border": "rgba(255,255,255,0.13)",
-  "shadow": "rgba(0,0,0,0.6)",
-  "border-radius": "16px",
-  "font-family": "'Inter', system-ui, sans-serif",
-});
 
 type Status = { kind: "idle" | "info" | "success" | "error"; msg: string; hash?: string };
 
@@ -75,13 +34,8 @@ export default function Wallet() {
   const connect = useCallback(async () => {
     setStatus({ kind: "info", msg: "Choose a wallet…" });
     try {
-      const { address: addr } = await StellarWalletsKit.authModal();
-      if (!addr) {
-        setStatus({ kind: "error", msg: "No wallet selected." });
-        return;
-      }
+      const addr = await kitConnect();
       setAddress(addr);
-      sessionStorage.setItem("prism_wallet_address", addr);
       setStatus({ kind: "idle", msg: "" });
       await loadBalance(addr);
     } catch (e) {
@@ -90,13 +44,8 @@ export default function Wallet() {
   }, [loadBalance]);
 
   const disconnect = useCallback(async () => {
-    try {
-      await StellarWalletsKit.disconnect();
-    } catch {
-      /* ignore */
-    }
+    await kitDisconnect();
     setAddress(null);
-    sessionStorage.removeItem("prism_wallet_address");
     setBalance(null);
     setDest("");
     setAmount("");
@@ -124,7 +73,7 @@ export default function Wallet() {
         .build();
 
       setStatus({ kind: "info", msg: "Awaiting wallet signature…" });
-      const { signedTxXdr } = await StellarWalletsKit.signTransaction(tx.toXDR(), {
+      const { signedTxXdr } = await kit.signTransaction(tx.toXDR(), {
         networkPassphrase: NETWORK_PASSPHRASE,
         address,
       });
