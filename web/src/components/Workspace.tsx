@@ -34,6 +34,7 @@ export default function Workspace() {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status>({ kind: "idle", msg: "" });
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const [daily, setDaily] = useState("50");
   const [perTask, setPerTask] = useState("10");
@@ -101,6 +102,7 @@ export default function Workspace() {
       const hash = await fundTreasury(treasuryId, address, walletSignerFor(address), Number(fundAmt));
       setStatus({ kind: "success", msg: "Funded ✓", hash });
       setFundAmt("");
+      setRefreshKey((k) => k + 1);
       await loadState(treasuryId, address);
     } catch (e) {
       setStatus({ kind: "error", msg: errText(e) });
@@ -135,6 +137,7 @@ export default function Workspace() {
       if (res.ok) {
         setStatus({ kind: "success", msg: "Payment settled ✓", hash: res.hash });
         setPayAmt("");
+        setRefreshKey((k) => k + 1);
       } else {
         trackViolation();
         setStatus({ kind: "error", msg: `Blocked by policy: ${res.errorMessage}` });
@@ -224,7 +227,7 @@ export default function Workspace() {
               <button style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }} onClick={spend} disabled={busy}>Send payment</button>
             </Section>
 
-            <Analytics contractId={treasuryId} />
+            <Analytics contractId={treasuryId} refreshKey={refreshKey} />
           </>
         )}
 

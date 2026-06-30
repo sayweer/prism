@@ -7,12 +7,17 @@ import { RPC_URL } from "../config";
 import { fetchEventsPage, type FeedEvent } from "../lib/events";
 import { agentScorecard, getMonitor, spendSeries } from "../lib/analytics";
 
-export default function Analytics({ contractId }: { contractId: string }) {
+export default function Analytics({ contractId, refreshKey = 0 }: { contractId: string; refreshKey?: number }) {
   const [events, setEvents] = useState<FeedEvent[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [tick, setTick] = useState(0);
 
+  // Re-fetch on contract change, after a parent action (refreshKey), or manual ↻ (tick).
+  // RPC indexes a new payment a few seconds after it lands, so the manual refresh covers
+  // the lag where an auto-refresh fires before the event is queryable.
   useEffect(() => {
     let alive = true;
+    setState("loading");
     (async () => {
       try {
         const server = new rpc.Server(RPC_URL);
@@ -30,7 +35,7 @@ export default function Analytics({ contractId }: { contractId: string }) {
     return () => {
       alive = false;
     };
-  }, [contractId]);
+  }, [contractId, refreshKey, tick]);
 
   const score = agentScorecard(events);
   const series = spendSeries(events);
@@ -39,7 +44,10 @@ export default function Analytics({ contractId }: { contractId: string }) {
 
   return (
     <div style={{ marginTop: 18 }}>
-      <div style={label}>Analytics &amp; monitoring</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={label}>Analytics &amp; monitoring</div>
+        <button style={refreshBtn} onClick={() => setTick((t) => t + 1)} type="button">↻ Refresh</button>
+      </div>
       <div style={grid}>
         <Stat label="Payments" value={String(score.payments)} />
         <Stat label="Total spent" value={`${score.totalXlm.toFixed(2)} XLM`} />
@@ -92,3 +100,7 @@ const grid: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1
 const statBox: React.CSSProperties = { padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" };
 const bars: React.CSSProperties = { display: "flex", alignItems: "flex-end", gap: 4, height: 48, marginTop: 10 };
 const bar: React.CSSProperties = { flex: 1, background: "#FDDA24", borderRadius: 3, minWidth: 4 };
+const refreshBtn: React.CSSProperties = {
+  background: "transparent", border: "1px solid rgba(255,255,255,0.14)", color: "#A0A0B8",
+  borderRadius: 8, padding: "4px 9px", fontSize: 11.5, cursor: "pointer",
+};
