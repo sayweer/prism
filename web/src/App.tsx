@@ -26,8 +26,9 @@ function lazyWithReload<T extends ComponentType<any>>(factory: () => Promise<{ d
 const Dashboard = lazyWithReload(() => import("./components/Dashboard"));
 const Wallet = lazyWithReload(() => import("./components/Wallet"));
 const ActivityFeed = lazyWithReload(() => import("./components/ActivityFeed"));
+const Workspace = lazyWithReload(() => import("./components/Workspace"));
 
-type View = "landing" | "dashboard" | "wallet" | "activity";
+type View = "landing" | "dashboard" | "wallet" | "activity" | "workspace";
 
 export default function App() {
   const [view, setView] = useState<View>("landing");
@@ -45,6 +46,9 @@ export default function App() {
           navbar (Wallet/Activity live there now), so this would just clutter it. */}
       {view !== "landing" && (
         <nav style={nav}>
+          <button style={navBtn(view === "workspace")} onClick={() => go("workspace")}>
+            My Prism
+          </button>
           <button style={navBtn(view === "dashboard")} onClick={() => go("landing")}>
             Agent demo
           </button>
@@ -59,7 +63,17 @@ export default function App() {
 
       <Suspense fallback={null}>
         <AnimatePresence mode="wait">
-          {view === "wallet" ? (
+          {view === "workspace" ? (
+            <motion.div
+              key="workspace"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <Workspace />
+            </motion.div>
+          ) : view === "wallet" ? (
             <motion.div
               key="wallet"
               initial={{ opacity: 0 }}
@@ -91,6 +105,7 @@ export default function App() {
                 onLaunch={() => go("dashboard")}
                 onWallet={() => go("wallet")}
                 onActivity={() => go("activity")}
+                onWorkspace={() => go("workspace")}
               />
             </motion.div>
           ) : (

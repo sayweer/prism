@@ -120,10 +120,12 @@ export default function Landing({
   onLaunch,
   onWallet,
   onActivity,
+  onWorkspace,
 }: {
   onLaunch: () => void;
   onWallet: () => void;
   onActivity: () => void;
+  onWorkspace: () => void;
 }) {
   return (
     <div className="lx">
@@ -135,9 +137,10 @@ export default function Landing({
           <a href="#how">How it works</a>
           <button className="navlink" onClick={onWallet}>Wallet</button>
           <button className="navlink" onClick={onActivity}>Activity</button>
+          <button className="navlink" onClick={onLaunch}>Demo</button>
           <a href="https://github.com/Bekirerdem/prism" target="_blank" rel="noreferrer">GitHub ↗</a>
         </div>
-        <button className="navcta" onClick={onLaunch}>Launch demo</button>
+        <button className="navcta" onClick={onWorkspace}>Open app</button>
       </nav>
 
       <main className="wrap">
