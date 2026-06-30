@@ -15,6 +15,8 @@ import {
 } from "../lib/userTreasury";
 import { EXPLORER, fmtUSDC, shortAddr } from "../config";
 import { connectErr } from "../lib/wallet-errors";
+import { trackError, trackViolation } from "../lib/analytics";
+import Analytics from "./Analytics";
 
 // XLM and USDC are both 7-decimal; fmtUSDC is pure math, so reuse it and label XLM.
 const fmtXlm = (s: bigint) => fmtUSDC(s, 4);
@@ -134,10 +136,12 @@ export default function Workspace() {
         setStatus({ kind: "success", msg: "Payment settled ✓", hash: res.hash });
         setPayAmt("");
       } else {
+        trackViolation();
         setStatus({ kind: "error", msg: `Blocked by policy: ${res.errorMessage}` });
       }
       await loadState(treasuryId, address);
     } catch (e) {
+      trackError(errText(e));
       setStatus({ kind: "error", msg: errText(e) });
     } finally {
       setBusy(false);
@@ -219,6 +223,8 @@ export default function Workspace() {
               <input style={input} inputMode="decimal" placeholder="Amount (XLM)" value={payAmt} onChange={(e) => setPayAmt(e.target.value)} />
               <button style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }} onClick={spend} disabled={busy}>Send payment</button>
             </Section>
+
+            <Analytics contractId={treasuryId} />
           </>
         )}
 

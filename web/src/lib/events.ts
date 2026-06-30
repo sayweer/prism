@@ -12,6 +12,7 @@ export interface FeedEvent {
   label: string; // human summary
   txHash: string;
   at: string; // ISO timestamp (ledgerClosedAt)
+  amountXlm?: number; // for `paid` events — the XLM amount, used by analytics
 }
 
 const short = (s: unknown) => {
@@ -49,21 +50,25 @@ export function formatEvent(topics: unknown[], data: unknown): { kind: string; l
   }
 }
 
-/** One page of getEvents, decoded into feed items. Pass either startLedger or a cursor. */
+/** One page of getEvents, decoded into feed items. Pass contractIds to watch a specific
+ *  treasury (defaults to the demo treasury + verifier), plus either startLedger or a cursor. */
 export async function fetchEventsPage(
   server: rpc.Server,
-  opts: { startLedger?: number; cursor?: string },
+  opts?: { contractIds?: string[]; startLedger?: number; cursor?: string },
 ): Promise<{ events: FeedEvent[]; cursor: string }> {
-  const filters = [{ type: "contract" as const, contractIds: WATCHED }];
+  const o = opts ?? {};
+  const filters = [{ type: "contract" as const, contractIds: o.contractIds ?? WATCHED }];
   const res = await server.getEvents(
-    opts.cursor ? { cursor: opts.cursor, filters } : { startLedger: opts.startLedger ?? 0, filters },
+    o.cursor ? { cursor: o.cursor, filters } : { startLedger: o.startLedger ?? 0, filters },
   );
 
   const events = res.events.map((e): FeedEvent => {
     const topics = e.topic.map((t) => scValToNative(t));
     const data = scValToNative(e.value);
     const { kind, label } = formatEvent(topics, data);
-    return { id: e.id, kind, label, txHash: e.txHash, at: e.ledgerClosedAt };
+    const d = data as unknown[];
+    const amountXlm = kind === "paid" ? Number(d?.[1]) / 1e7 : undefined;
+    return { id: e.id, kind, label, txHash: e.txHash, at: e.ledgerClosedAt, amountXlm };
   });
   return { events, cursor: (res as { cursor?: string }).cursor ?? "" };
 }
