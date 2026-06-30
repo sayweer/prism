@@ -148,6 +148,19 @@ Three upgrades take Prism from a walled garden to the open agent economy — eac
 4. **Auto-reconciled spend** — per-task accounting, read straight from the contract.
 5. **Funding rail** — fund a budget via its zero-cost muxed sub-address; the deposit is attributed on-chain with no memo.
 
+## Use your own treasury (per-user product)
+
+Beyond the spectator demo, **connect a wallet and run your own** bounded treasury — open the app and pick **Open app**:
+
+1. **Connect a wallet** — any Stellar wallet, testnet.
+2. **Create treasury** — set your daily + per-payment limits; the contract deploys with you as owner (`admin = agent = your wallet`, non-custodial).
+3. **Fund** it with testnet XLM from your wallet.
+4. **Whitelist** the payees your agent may pay.
+5. **Spend** — in-policy payments settle on-chain; anything over a limit or to a non-whitelisted payee is **rejected by the contract** (`ExceedsTaskLimit` / `PayeeNotWhitelisted`), funds never move.
+6. **Analytics & monitoring** — payment count, total spent, policy violations, and runtime errors, read from your treasury's on-chain events.
+
+Every action is signed by your own wallet — non-custodial end to end. In-app feedback steers the roadmap.
+
 ## Live on testnet
 
 | Contract | Address |
