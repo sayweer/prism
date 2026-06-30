@@ -22,7 +22,10 @@ export default function Analytics({ contractId, refreshKey = 0 }: { contractId: 
       try {
         const server = new rpc.Server(RPC_URL);
         const latest = await server.getLatestLedger();
-        const start = Math.max(1, latest.sequence - 17280); // ~last day (5s ledgers)
+        // getEvents returns a single bounded page (~10k-ledger span); too wide a start
+        // makes a recent payment land beyond page one and get missed. ~12h keeps it on
+        // the first page (verified: latest-9000 returns the event, latest-17280 returns 0).
+        const start = Math.max(1, latest.sequence - 9000);
         const page = await fetchEventsPage(server, { contractIds: [contractId], startLedger: start });
         if (alive) {
           setEvents(page.events);
