@@ -180,6 +180,40 @@ The dashboard reads live testnet state, and the embedded agent key (testnet-only
 
 The **Wallet** tab (top-right nav) is a self-contained Stellar dApp — connect/disconnect **any Stellar wallet** (Freighter · xBull · Albedo · LOBSTR · Rabet · Hana, via [**StellarWalletsKit**](https://stellarwalletskit.dev/)), view your testnet **XLM balance**, and **send an XLM payment** with success/failure + tx-hash feedback. It surfaces three error types (wallet not installed · request rejected · insufficient balance) and is also the foundation of Prism's per-user login (*connect your wallet = your account*).
 
+### Stellar wallet dApp — fundamentals (`web/src/components/Wallet.tsx`)
+
+The wallet flow is a self-contained Stellar dApp implemented in **[`web/src/components/Wallet.tsx`](https://github.com/Bekirerdem/prism/blob/main/web/src/components/Wallet.tsx)** — multi-wallet connection via [`@creit.tech/stellar-wallets-kit`](https://stellarwalletskit.dev/), which wraps **Freighter** and five other Stellar wallets. Every wallet-fundamentals requirement maps to real client-side code:
+
+| Requirement | Where (`Wallet.tsx`) |
+|---|---|
+| Wallet setup — Freighter + Stellar **Testnet** | `StellarWalletsKit.init({ network: Networks.TESTNET, selectedWalletId: FREIGHTER_ID, modules: [new FreighterModule(), …] })` |
+| **Connect** wallet | `const { address } = await StellarWalletsKit.authModal()` |
+| **Disconnect** wallet | `await StellarWalletsKit.disconnect()` |
+| Fetch + display **XLM balance** | `server.loadAccount(addr)` → `balances.find(b => b.asset_type === "native")`, rendered in the UI |
+| **Send** an XLM transaction (testnet) | `TransactionBuilder` + `Operation.payment` → `StellarWalletsKit.signTransaction(xdr)` → `server.submitTransaction` |
+| Transaction **feedback** (success/failure + tx hash) | success state renders `res.hash` with a Stellar Expert `view tx ↗` link; failures surface a typed error |
+| **Error handling** | three distinct cases via `connectErr` / `sendErr` — wallet not installed · request rejected · insufficient balance |
+
+```ts
+// connect — open the wallet-select modal, then load the balance
+const { address: addr } = await StellarWalletsKit.authModal();
+setAddress(addr);
+await loadBalance(addr);
+
+// send — build, sign with the connected wallet, submit, surface the tx hash
+const tx = new TransactionBuilder(source, { fee: BASE_FEE, networkPassphrase: NETWORK_PASSPHRASE })
+  .addOperation(Operation.payment({ destination: dest, asset: Asset.native(), amount }))
+  .setTimeout(180).build();
+const { signedTxXdr } = await StellarWalletsKit.signTransaction(tx.toXDR(), {
+  networkPassphrase: NETWORK_PASSPHRASE,
+  address,
+});
+const res = await server.submitTransaction(TransactionBuilder.fromXDR(signedTxXdr, NETWORK_PASSPHRASE));
+setStatus({ kind: "success", msg: "Payment sent — confirmed on testnet ✓", hash: res.hash });
+```
+
+> **Monorepo note for reviewers:** the wallet dApp lives under **`web/`** (Vite · React · TS); `contracts/` holds the unrelated Soroban code. The client-side wallet integration is entirely in `web/src/components/Wallet.tsx` + `web/src/lib/wallet-errors.ts`, not in the contract crates.
+
 ### Screenshots
 
 **The agent dashboard — an AI agent spent real money, safely** (treasury balance, per-task & daily limits, live on-chain settlement):
