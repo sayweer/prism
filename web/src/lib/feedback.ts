@@ -50,6 +50,10 @@ export async function submitFeedback(
     handle: input.handle?.trim() || null,
     wallet_address: input.walletAddress?.trim() || null,
   });
-  if (error) return { ok: false, error: "Could not send feedback. Please try again." };
+  if (error) {
+    // Surface the real cause for monitoring; the user still sees a friendly message.
+    console.error("[prism] feedback insert failed:", error.message);
+    return { ok: false, error: "Could not send feedback. Please try again." };
+  }
   return { ok: true };
 }
