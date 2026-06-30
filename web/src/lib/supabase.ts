@@ -1,9 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 
-// .trim() guards against trailing newlines/whitespace in env values (e.g. from
-// `vercel env add` over a pipe) — a stray "\n" in the URL/key breaks the client.
-const url = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
-const anonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
+// Strip any non-printable-ASCII bytes from env values. A BOM / zero-width char (U+FEFF,
+// U+200B) can sneak in when pasting into `vercel env add`; supabase-js sets the anon key as
+// an HTTP header, and a non-ISO-8859-1 code point throws "Failed to execute 'set' on
+// 'Headers'" — so the insert never even goes out. `.trim()` misses U+200B, so strip
+// everything outside printable ASCII (keys and URLs are ASCII anyway).
+const clean = (s?: string): string | undefined => s?.replace(/[^\x20-\x7E]/g, "");
+const url = clean(import.meta.env.VITE_SUPABASE_URL as string | undefined);
+const anonKey = clean(import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined);
 
 // Feedback is optional infrastructure — if env is missing in a build, the form
 // degrades gracefully (see lib/feedback.ts) instead of crashing the app.
