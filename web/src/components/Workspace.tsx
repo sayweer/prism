@@ -16,6 +16,7 @@ import {
 import { EXPLORER, fmtUSDC, shortAddr } from "../config";
 import { connectErr } from "../lib/wallet-errors";
 import { trackError, trackViolation } from "../lib/analytics";
+import { logActivity } from "../lib/activity";
 import Analytics from "./Analytics";
 
 // XLM and USDC are both 7-decimal; fmtUSDC is pure math, so reuse it and label XLM.
@@ -80,6 +81,7 @@ export default function Workspace() {
       const id = await deployTreasury(address, walletSignerFor(address), Number(daily), Number(perTask));
       setTreasuryId(address, id);
       setTreasuryIdState(id);
+      void logActivity({ walletAddress: address, treasuryId: id, action: "deploy" });
       setStatus({ kind: "success", msg: `Treasury deployed: ${shortAddr(id)}` });
     } catch (e) {
       setStatus({ kind: "error", msg: errText(e) });
@@ -100,6 +102,7 @@ export default function Workspace() {
     setStatus({ kind: "info", msg: "Funding — confirm in your wallet…" });
     try {
       const hash = await fundTreasury(treasuryId, address, walletSignerFor(address), Number(fundAmt));
+      void logActivity({ walletAddress: address, treasuryId, action: "fund", txHash: hash, amountXlm: Number(fundAmt) });
       setStatus({ kind: "success", msg: "Funded ✓", hash });
       setFundAmt("");
       setRefreshKey((k) => k + 1);
@@ -118,6 +121,7 @@ export default function Workspace() {
     try {
       const t = makeTreasury(treasuryId, address, walletSignerFor(address));
       await addPayee(t, payee.trim());
+      void logActivity({ walletAddress: address, treasuryId, action: "whitelist" });
       setStatus({ kind: "success", msg: `Payee whitelisted: ${shortAddr(payee.trim())}` });
       setPayee("");
     } catch (e) {
@@ -135,11 +139,13 @@ export default function Workspace() {
       const t = makeTreasury(treasuryId, address, walletSignerFor(address));
       const res = await pay(t, BigInt(Date.now()), payTo.trim(), Number(payAmt));
       if (res.ok) {
+        void logActivity({ walletAddress: address, treasuryId, action: "pay", txHash: res.hash, amountXlm: Number(payAmt) });
         setStatus({ kind: "success", msg: "Payment settled ✓", hash: res.hash });
         setPayAmt("");
         setRefreshKey((k) => k + 1);
       } else {
         trackViolation();
+        void logActivity({ walletAddress: address, treasuryId, action: "reject", amountXlm: Number(payAmt) });
         setStatus({ kind: "error", msg: `Blocked by policy: ${res.errorMessage}` });
       }
       await loadState(treasuryId, address);
