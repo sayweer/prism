@@ -150,14 +150,16 @@ Three upgrades take Prism from a walled garden to the open agent economy — eac
 
 ## Use your own treasury (per-user product)
 
-Beyond the spectator demo, **connect a wallet and run your own** bounded treasury — open the app and pick **Open app**:
+Beyond the spectator demo, **connect a wallet and run your own** bounded treasury — [open the app](https://prism-stellar.vercel.app) and pick **Open app**. Türkçe hızlı başlangıç: [`docs/TRY-IT-TR.md`](docs/TRY-IT-TR.md).
 
-1. **Connect a wallet** — any Stellar wallet, testnet.
-2. **Create treasury** — set your daily + per-payment limits; the contract deploys with you as owner (`admin = agent = your wallet`, non-custodial).
-3. **Fund** it with testnet XLM from your wallet.
-4. **Whitelist** the payees your agent may pay.
-5. **Spend** — in-policy payments settle on-chain; anything over a limit or to a non-whitelisted payee is **rejected by the contract** (`ExceedsTaskLimit` / `PayeeNotWhitelisted`), funds never move.
-6. **Analytics & monitoring** — payment count, total spent, policy violations, and runtime errors, read from your treasury's on-chain events.
+1. **Install a Stellar wallet** — e.g. [Freighter](https://www.freighter.app/), switched to **Testnet** in its settings.
+2. **Connect** — any Stellar wallet, testnet.
+3. **Get free testnet XLM** — a fresh wallet has 0 XLM; the app detects it and offers one-click [friendbot](https://friendbot.stellar.org) funding. (Per-user treasuries run on native testnet XLM; the USDC rail is the spectator demo.)
+4. **Create treasury** — set your daily + per-payment limits; the contract deploys with you as owner (`admin = agent = your wallet`, non-custodial). **Copy your treasury ID** (the "Copy ID" button) and keep it — it's how you reopen the treasury from another browser or device.
+5. **Fund** it with testnet XLM from your wallet.
+6. **Whitelist** the payees your agent may pay — no second address handy? the app offers a sample vendor to whitelist.
+7. **Spend** — in-policy payments settle on-chain; anything over a limit or to a non-whitelisted payee is **rejected by the contract** (`ExceedsTaskLimit` / `PayeeNotWhitelisted`), funds never move. The rejection is the product working.
+8. **Analytics & monitoring** — payment count, total spent, policy violations, and runtime errors, read from your treasury's on-chain events.
 
 Every action is signed by your own wallet — non-custodial end to end. In-app feedback steers the roadmap.
 
