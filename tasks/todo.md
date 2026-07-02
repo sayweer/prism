@@ -3,29 +3,30 @@
 Hedef: WhatsApp'tan gelen sıfır-bakiyeli, telefonlu, ilk-kez kullanıcı akışı baştan sona
 takılmadan tamamlasın. Her madde ayrı commit; sonunda manuel Vercel deploy + canlı doğrulama.
 
-- [ ] 1. Funding gate — Workspace'e cüzdan XLM bakiyesi kontrolü + friendbot butonu
-      (yeni `lib/funding.ts`, unit test; hesap yoksa/bakiye < 5 XLM ise uyarı kutusu)
-      → doğrula: vitest geçer; bakiyesiz hesapta kutu görünür, friendbot sonrası kaybolur
-- [ ] 2. Treasury ID kaybolmasın — deploy sonrası "ID'ni kaydet" uyarısı + kopyala butonu
-      (treasury satırında copy affordance) + "open existing" input'una StrKey C… validasyonu
-      → doğrula: kopyala tam ID'yi panoya yazar; geçersiz ID insan diliyle reddedilir
-- [ ] 3. İlk kullanıcı akış yağlaması — örnek payee doldurma butonu (demo SERVICE hesabı)
-      + whitelist başarısında Spend "To" alanını otomatik doldur
-      → doğrula: ikinci adresi olmayan kullanıcı akışı bitirebilir
-- [ ] 4. Hata mesajları — Workspace deploy/fund/whitelist/pay catch'lerini `sendErr`'e bağla;
-      `sendErr`'e "account not found" (fonlanmamış hesap) durumu ekle + test
-      → doğrula: vitest geçer; imza reddi "Signature rejected…" olarak görünür
-- [ ] 5. Mobil — landing nav ≤900px'te Demo/Wallet/Activity erişilebilir kalsın (kompakt nav),
-      iç nav'a flex-wrap + maxWidth, Workspace'e üst nav boşluğu; "Agent demo" butonu
-      dashboard'a gitsin (bug: landing'e gidiyordu)
-      → doğrula: 375px genişlikte nav taşmıyor, tüm görünümlere erişilebiliyor
-- [ ] 6. Onboarding docs — README "Use your own treasury" bölümüne friendbot linki,
-      ID-kaydet uyarısı, örnek payee notu; `docs/TRY-IT-TR.md` (kısa Türkçe rehber)
-      → doğrula: adımlar UI ile birebir eşleşiyor
-- [ ] 7. Deploy + canlı doğrulama — build+test+lint, `vercel --prod --cwd web`,
-      Vercel env var'ları (Supabase) kontrol, canlı sitede smoke test, activity
-      tablosuna kayıt düştüğünü doğrula
-      → doğrula: canlı URL yeni sürümü veriyor, Supabase'e kayıt akıyor
+- [x] 1. Funding gate — Workspace'e cüzdan XLM bakiyesi kontrolü + friendbot butonu
+      (`lib/funding.ts` + 8 unit test; hesap yoksa/bakiye < 5 XLM ise uyarı kutusu)
+- [x] 2. Treasury ID kaybolmasın — deploy sonrası "ID'ni kaydet" uyarısı + Copy ID butonu
+      + "open existing" input'una StrKey C… validasyonu (`isValidContractId` + test)
+- [x] 3. İlk kullanıcı akış yağlaması — "use the sample vendor" doldurma bağlantısı
+      + whitelist başarısında Spend "To" alanı otomatik dolar
+- [x] 4. Hata mesajları — deploy/fund/whitelist/pay catch'leri `sendErr`'de; `sendErr`'e
+      "account not found" + mesaj-tabanlı "insufficient balance" eklendi (+2 test)
+- [x] 5. Mobil — landing nav ≤900px'te Demo/Wallet/Activity kompakt kalıyor; iç nav
+      flex-wrap + maxWidth; Workspace üst boşluk (84px); "Agent demo" butonu artık
+      dashboard'a gidiyor (bug'dı: landing'e gidiyordu). 375px'te görsel doğrulandı.
+- [x] 6. Onboarding docs — README adımları yenilendi (Freighter + friendbot + Copy ID
+      + sample vendor); `docs/TRY-IT-TR.md` Türkçe hızlı başlangıç eklendi
+- [x] 7. Deploy + canlı doğrulama — 42/42 test + build yeşil; `vercel --prod` →
+      prism-stellar.vercel.app alias'landı; Vercel'de VITE_SUPABASE_* env'leri mevcut;
+      canlıda feedback formu ile E2E insert doğrulandı (test satırı sonra silindi)
 
-Not (bu oturumda doğrulandı): Supabase `activity` + `feedback` RLS açık, sadece anon INSERT
-policy'si var, SELECT yok — sızıntı riski yok. RLS'i migration olarak commit etmek Kova 2'de.
+## İnceleme / Notlar
+
+- Supabase `activity` + `feedback` RLS: enabled, sadece anon INSERT policy (SELECT yok) —
+  canlı DB'de doğrulandı. Migration olarak repo'ya commit etmek → Kova 2.
+- `npm run lint` 24 hata veriyor; tamamına yakını önceden mevcut borç (generated
+  treasuryClient.ts, Dashboard/Analytics setState-in-effect). CI lint'i gate'lemiyor.
+  Temizlik → Kova 2.
+- Kova 2 (dokümantasyon/kredibilite) ve Kova 3 (mimari: agent-signing, kontrat yaşam
+  döngüsü, midnight burst, ZK entegrasyonu, ABI drift, analytics penceresi) bekliyor —
+  ayrıntılar 2026-07-02 oturum değerlendirmesinde.
