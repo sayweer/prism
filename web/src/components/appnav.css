@@ -33,6 +33,9 @@
   transition:transform .2s ease, filter .2s ease, box-shadow .2s ease;
 }
 .anav__cta:hover{ transform:translateY(-1px); filter:brightness(1.08); box-shadow:0 10px 26px -10px #FDDA24; }
+/* Ghost variant — for the landing nav, where "Open app" stays the one primary CTA. */
+.anav__cta--ghost{ background:rgba(255,255,255,0.05); color:#EDEDF4; border:1px solid rgba(255,255,255,0.14); }
+.anav__cta--ghost:hover{ transform:none; filter:none; box-shadow:none; background:rgba(255,255,255,0.09); }
 .anav__wallet{ position:relative; flex:0 0 auto; }
 .anav__chip{
   display:inline-flex; align-items:center; gap:7px;

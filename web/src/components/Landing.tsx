@@ -1,7 +1,10 @@
-import { type ReactNode } from "react";
+import { Suspense, lazy, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { TREASURY_ID, contractUrl } from "../config";
 import "./landing.css";
+
+// The wallet chip pulls in the wallet kit — lazy so the landing bundle stays light.
+const WalletChip = lazy(() => import("./WalletChip"));
 
 const EASE = [0.22, 1, 0.36, 1] as const; // cinematic expo-out
 
@@ -129,17 +132,22 @@ export default function Landing({
 }) {
   return (
     <div className="lx">
-      {/* nav */}
+      {/* nav — content links in the middle; wallet state + the app CTA on the right
+          (the wallet is session state, not a page, so it doesn't sit between links) */}
       <nav className="nav">
         <div className="brand"><span className="glyph" /> Prism</div>
         <div className="links">
           <span className="live"><i /> Stellar Testnet</span>
           <a href="#how">How it works</a>
-          <button className="navlink" onClick={onWallet}>Wallet</button>
-          <button className="navlink" onClick={onActivity}>Activity</button>
           <button className="navlink" onClick={onLaunch}>Demo</button>
+          <button className="navlink" onClick={onActivity}>Activity</button>
           <a href="https://github.com/Bekirerdem/prism" target="_blank" rel="noreferrer">GitHub ↗</a>
         </div>
+        <span className="walletslot">
+          <Suspense fallback={null}>
+            <WalletChip variant="ghost" onWalletView={onWallet} />
+          </Suspense>
+        </span>
         <button className="navcta" onClick={onWorkspace}>Open app</button>
       </nav>
 

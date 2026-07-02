@@ -214,5 +214,6 @@
   .lx .nav .links a, .lx .nav .links .live{ display:none; }
   .lx .nav .links .navlink{ font-size:12.5px; }
   .lx .nav .navcta{ padding:8px 13px; font-size:12.5px; }
+  .lx .nav .walletslot{ display:none; } /* wallet lives in the in-app nav chip on phones */
 }
 @media(prefers-reduced-motion:reduce){ .cine__glow, .cine__rays{ animation:none } }
