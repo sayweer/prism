@@ -1,5 +1,18 @@
 import { describe, it, expect } from "vitest";
-import { toStroops } from "./userTreasury";
+import { isValidContractId, toStroops, XLM_SAC } from "./userTreasury";
+
+describe("isValidContractId", () => {
+  it("accepts a real contract id", () => {
+    expect(isValidContractId(XLM_SAC)).toBe(true);
+  });
+
+  it("rejects wallet addresses, truncated ids, and junk", () => {
+    expect(isValidContractId("GDPKXL6CNHUXBV4PM54CPTRZNQRYVTIMO4YGBW3M2MNSCMQ7TTNINXP6")).toBe(false);
+    expect(isValidContractId(XLM_SAC.slice(0, 30))).toBe(false);
+    expect(isValidContractId("not-a-contract")).toBe(false);
+    expect(isValidContractId("")).toBe(false);
+  });
+});
 
 describe("toStroops", () => {
   it("converts whole XLM to 7-decimal stroops", () => {

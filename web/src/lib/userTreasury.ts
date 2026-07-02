@@ -7,6 +7,7 @@ import {
   Contract,
   nativeToScVal,
   rpc,
+  StrKey,
   TransactionBuilder,
 } from "@stellar/stellar-sdk";
 import { Client, Errors } from "./treasuryClient";
@@ -20,6 +21,11 @@ export const TREASURY_WASM_HASH =
   "41c8bb1f0b4d9bd7b89c3a855ee87cb56971a256fe110cd2860d406dde040c2b";
 
 const XLM_UNIT = 10_000_000;
+
+/** Whether a pasted string is a well-formed contract id (C…, 56 chars, valid checksum). */
+export function isValidContractId(id: string): boolean {
+  return StrKey.isValidContract(id);
+}
 
 /** XLM (float) -> i128 stroops (7 decimals), rounded to avoid float drift. */
 export function toStroops(xlm: number): bigint {

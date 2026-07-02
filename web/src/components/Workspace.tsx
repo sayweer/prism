@@ -8,6 +8,7 @@ import {
   addPayee,
   deployTreasury,
   fundTreasury,
+  isValidContractId,
   makeTreasury,
   pay,
   readState,
@@ -40,6 +41,7 @@ export default function Workspace() {
   // undefined = not checked yet (or Horizon unreachable) → no gate shown; null = no account.
   const [walletXlm, setWalletXlm] = useState<number | null | undefined>(undefined);
   const [funding, setFunding] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const [daily, setDaily] = useState("50");
   const [perTask, setPerTask] = useState("10");
@@ -113,7 +115,10 @@ export default function Workspace() {
       setTreasuryId(address, id);
       setTreasuryIdState(id);
       void logActivity({ walletAddress: address, treasuryId: id, action: "deploy" });
-      setStatus({ kind: "success", msg: `Treasury deployed: ${shortAddr(id)}` });
+      setStatus({
+        kind: "success",
+        msg: "Treasury deployed ✓ — copy your treasury ID (top of the card) and keep it: it's how you reopen this treasury from another browser or device.",
+      });
     } catch (e) {
       setStatus({ kind: "error", msg: errText(e) });
     } finally {
@@ -123,9 +128,29 @@ export default function Workspace() {
 
   const useExisting = useCallback(() => {
     if (!address || !existing.trim()) return;
-    setTreasuryId(address, existing.trim());
-    setTreasuryIdState(existing.trim());
+    const id = existing.trim();
+    if (!isValidContractId(id)) {
+      setStatus({
+        kind: "error",
+        msg: "That doesn't look like a treasury contract ID — it starts with C and is 56 characters long.",
+      });
+      return;
+    }
+    setTreasuryId(address, id);
+    setTreasuryIdState(id);
+    setStatus({ kind: "idle", msg: "" });
   }, [address, existing]);
+
+  const copyId = useCallback(async () => {
+    if (!treasuryId) return;
+    try {
+      await navigator.clipboard.writeText(treasuryId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard blocked (permissions) — the explorer link still exposes the full id.
+    }
+  }, [treasuryId]);
 
   const fund = useCallback(async () => {
     if (!address || !treasuryId) return;
@@ -244,9 +269,14 @@ export default function Workspace() {
             <div style={row}>
               <div>
                 <div style={label}>Treasury</div>
-                <a style={mono} href={`${EXPLORER}/contract/${treasuryId}`} target="_blank" rel="noreferrer">
-                  {shortAddr(treasuryId)} ↗
-                </a>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <a style={mono} href={`${EXPLORER}/contract/${treasuryId}`} target="_blank" rel="noreferrer">
+                    {shortAddr(treasuryId)} ↗
+                  </a>
+                  <button style={copyBtn} onClick={copyId} type="button">
+                    {copied ? "Copied ✓" : "Copy ID"}
+                  </button>
+                </div>
               </div>
               <div style={{ textAlign: "right" }}>
                 <div style={label}>Owner</div>
@@ -337,6 +367,10 @@ const input: React.CSSProperties = {
 const primaryBtn: React.CSSProperties = {
   width: "100%", marginTop: 12, padding: "12px 16px", borderRadius: 11, border: "none", cursor: "pointer",
   background: "#FDDA24", color: "#0F0F0F", fontWeight: 600, fontSize: 15,
+};
+const copyBtn: React.CSSProperties = {
+  padding: "3px 9px", borderRadius: 7, fontSize: 11.5, cursor: "pointer",
+  background: "transparent", border: "1px solid rgba(255,255,255,0.18)", color: "#A0A0B8",
 };
 const ghostBtn: React.CSSProperties = {
   width: "100%", marginTop: 8, padding: "10px 14px", borderRadius: 10, cursor: "pointer", fontSize: 14,
