@@ -18,4 +18,12 @@ describe("sendErr", () => {
   it("maps a signature rejection", () => {
     expect(sendErr(new Error("User declined to sign"))).toMatch(/Signature rejected/);
   });
+  it("maps a not-yet-funded testnet account (RPC getAccount)", () => {
+    expect(sendErr(new Error("Account not found: GDPK…"))).toMatch(/no XLM on testnet/);
+  });
+  it("maps insufficient balance from a message (Soroban path)", () => {
+    expect(sendErr(new Error("transaction simulation failed: insufficient balance"))).toMatch(
+      /Insufficient balance/,
+    );
+  });
 });

@@ -14,9 +14,9 @@ import {
   readState,
   type PrismState,
 } from "../lib/userTreasury";
-import { EXPLORER, fmtUSDC, shortAddr } from "../config";
+import { EXPLORER, fmtUSDC, SERVICE, shortAddr } from "../config";
 import { fundWithFriendbot, getXlmBalance, needsFunding, MIN_XLM } from "../lib/funding";
-import { connectErr } from "../lib/wallet-errors";
+import { connectErr, sendErr } from "../lib/wallet-errors";
 import { trackError, trackViolation } from "../lib/analytics";
 import { logActivity } from "../lib/activity";
 import Analytics from "./Analytics";
@@ -120,7 +120,7 @@ export default function Workspace() {
         msg: "Treasury deployed ✓ — copy your treasury ID (top of the card) and keep it: it's how you reopen this treasury from another browser or device.",
       });
     } catch (e) {
-      setStatus({ kind: "error", msg: errText(e) });
+      setStatus({ kind: "error", msg: sendErr(e) });
     } finally {
       setBusy(false);
     }
@@ -165,7 +165,7 @@ export default function Workspace() {
       await loadState(treasuryId, address);
       void refreshWalletXlm(address);
     } catch (e) {
-      setStatus({ kind: "error", msg: errText(e) });
+      setStatus({ kind: "error", msg: sendErr(e) });
     } finally {
       setBusy(false);
     }
@@ -176,13 +176,15 @@ export default function Workspace() {
     setBusy(true);
     setStatus({ kind: "info", msg: "Whitelisting payee — confirm in your wallet…" });
     try {
+      const p = payee.trim();
       const t = makeTreasury(treasuryId, address, walletSignerFor(address));
-      await addPayee(t, payee.trim());
+      await addPayee(t, p);
       void logActivity({ walletAddress: address, treasuryId, action: "whitelist" });
-      setStatus({ kind: "success", msg: `Payee whitelisted: ${shortAddr(payee.trim())}` });
+      setStatus({ kind: "success", msg: `Payee whitelisted: ${shortAddr(p)} — now try a payment to it below.` });
       setPayee("");
+      setPayTo(p);
     } catch (e) {
-      setStatus({ kind: "error", msg: errText(e) });
+      setStatus({ kind: "error", msg: sendErr(e) });
     } finally {
       setBusy(false);
     }
@@ -207,8 +209,8 @@ export default function Workspace() {
       }
       await loadState(treasuryId, address);
     } catch (e) {
-      trackError(errText(e));
-      setStatus({ kind: "error", msg: errText(e) });
+      trackError(errText(e)); // raw message for monitoring; the classified one for the user
+      setStatus({ kind: "error", msg: sendErr(e) });
     } finally {
       setBusy(false);
     }
@@ -304,6 +306,12 @@ export default function Workspace() {
 
             <Section title="Whitelist a payee">
               <input style={input} placeholder="Payee address (G… or C…)" value={payee} onChange={(e) => setPayee(e.target.value)} />
+              <div style={hintRow}>
+                No second address handy?{" "}
+                <button style={inlineLink} type="button" onClick={() => setPayee(SERVICE)}>
+                  use the sample vendor ({shortAddr(SERVICE)})
+                </button>
+              </div>
               <button style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }} onClick={whitelist} disabled={busy}>Add payee</button>
             </Section>
 
@@ -367,6 +375,11 @@ const input: React.CSSProperties = {
 const primaryBtn: React.CSSProperties = {
   width: "100%", marginTop: 12, padding: "12px 16px", borderRadius: 11, border: "none", cursor: "pointer",
   background: "#FDDA24", color: "#0F0F0F", fontWeight: 600, fontSize: 15,
+};
+const hintRow: React.CSSProperties = { marginTop: 6, fontSize: 12, color: "#7C7C92" };
+const inlineLink: React.CSSProperties = {
+  background: "none", border: "none", padding: 0, cursor: "pointer",
+  color: "#A0A0B8", textDecoration: "underline", font: "inherit", fontSize: 12,
 };
 const copyBtn: React.CSSProperties = {
   padding: "3px 9px", borderRadius: 7, fontSize: 11.5, cursor: "pointer",

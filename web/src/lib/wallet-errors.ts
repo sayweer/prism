@@ -32,6 +32,12 @@ export function sendErr(e: unknown): string {
     return "Insufficient balance for this payment.";
   }
   const m = errText(e).toLowerCase();
+  if (m.includes("account not found") || m.includes("account does not exist")) {
+    return "Your wallet has no XLM on testnet yet — use the funding box above to get free testnet XLM first.";
+  }
+  if (m.includes("underfunded") || m.includes("insufficient balance")) {
+    return "Insufficient balance for this payment.";
+  }
   if (m.includes("reject") || m.includes("denied") || m.includes("declin") || m.includes("cancel")) {
     return "Signature rejected in your wallet.";
   }
