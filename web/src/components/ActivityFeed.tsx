@@ -1,10 +1,12 @@
 // Level 2 — real-time event synchronization. Cursor-polls Soroban RPC and streams the
 // treasury + verifier contract events into a live feed. (Premium visual pass is a later
 // phase with Gemini; this is the functional layer.)
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { rpc } from "@stellar/stellar-sdk";
-import { EXPLORER, RPC_URL } from "../config";
+import { EXPLORER, RPC_URL, TREASURY_ID, VERIFIER_ID } from "../config";
 import { fetchEventsPage, type FeedEvent } from "../lib/events";
+import { getAddress } from "../lib/walletKit";
+import { getTreasuryId } from "../lib/treasuryStore";
 
 const POLL_MS = 6000; // ~1 testnet ledger
 const MAX_ITEMS = 60;
@@ -12,6 +14,14 @@ const MAX_ITEMS = 60;
 export default function ActivityFeed() {
   const [events, setEvents] = useState<FeedEvent[]>([]);
   const [state, setState] = useState<"connecting" | "live" | "error">("connecting");
+
+  // Watch the connected user's own treasury alongside the demo treasury + verifier —
+  // otherwise a user's payments never show up here and the feed looks broken.
+  const contractIds = useMemo(() => {
+    const addr = getAddress();
+    const mine = addr ? getTreasuryId(addr) : null;
+    return mine ? [TREASURY_ID, VERIFIER_ID, mine] : [TREASURY_ID, VERIFIER_ID];
+  }, []);
 
   useEffect(() => {
     const server = new rpc.Server(RPC_URL);
@@ -22,7 +32,7 @@ export default function ActivityFeed() {
     const tick = async () => {
       if (stopped) return;
       try {
-        const page = await fetchEventsPage(server, cursor ? { cursor } : undefined as never);
+        const page = await fetchEventsPage(server, cursor ? { cursor, contractIds } : ({ contractIds } as never));
         if (page.events.length) {
           setEvents((prev) => dedupe([...page.events.reverse(), ...prev]).slice(0, MAX_ITEMS));
         }
@@ -37,7 +47,7 @@ export default function ActivityFeed() {
       try {
         const latest = await server.getLatestLedger();
         const start = Math.max(1, latest.sequence - 17280); // ~last day of activity (5s ledgers)
-        const page = await fetchEventsPage(server, { startLedger: start });
+        const page = await fetchEventsPage(server, { startLedger: start, contractIds });
         setEvents(dedupe(page.events.reverse()).slice(0, MAX_ITEMS));
         cursor = page.cursor;
         setState("live");
@@ -51,7 +61,7 @@ export default function ActivityFeed() {
       stopped = true;
       clearTimeout(timer);
     };
-  }, []);
+  }, [contractIds]);
 
   return (
     <div style={wrap}>
@@ -63,7 +73,8 @@ export default function ActivityFeed() {
           </span>
         </div>
         <p style={{ color: "#A0A0B8", marginTop: 6, fontSize: 14 }}>
-          Real-time on-chain events from the treasury &amp; ZK verifier, synced from Soroban RPC.
+          Real-time on-chain events from the demo treasury, the ZK verifier — and your own
+          treasury when your wallet is connected.
         </p>
 
         <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 8 }}>
