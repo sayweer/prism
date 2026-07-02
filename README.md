@@ -193,43 +193,11 @@ npm run dev        # opens on http://localhost:5173 (or the next free port)
 
 The dashboard reads live testnet state, and the embedded agent key (testnet-only, zero value) lets the agent sign its own payments — that's the whole point: **the contract is the safety, not a human clicking approve.** A build-time guard refuses to load the bundled key on any non-testnet network.
 
-The **Wallet** tab (top-right nav) is a self-contained Stellar dApp — connect/disconnect **any Stellar wallet** (Freighter · xBull · Albedo · LOBSTR · Rabet · Hana, via [**StellarWalletsKit**](https://stellarwalletskit.dev/)), view your testnet **XLM balance**, and **send an XLM payment** with success/failure + tx-hash feedback. It surfaces three error types (wallet not installed · request rejected · insufficient balance) and is also the foundation of Prism's per-user login (*connect your wallet = your account*).
-
-### Stellar wallet dApp — fundamentals (`web/src/components/Wallet.tsx`)
-
-The wallet flow is a self-contained Stellar dApp implemented in **[`web/src/components/Wallet.tsx`](https://github.com/Bekirerdem/prism/blob/main/web/src/components/Wallet.tsx)** — multi-wallet connection via [`@creit.tech/stellar-wallets-kit`](https://stellarwalletskit.dev/), which wraps **Freighter** and five other Stellar wallets. Every wallet-fundamentals requirement maps to real client-side code:
-
-| Requirement | Where (`Wallet.tsx`) |
-|---|---|
-| Wallet setup — Freighter + Stellar **Testnet** | `StellarWalletsKit.init({ network: Networks.TESTNET, selectedWalletId: FREIGHTER_ID, modules: [new FreighterModule(), …] })` |
-| **Connect** wallet | `const { address } = await StellarWalletsKit.authModal()` |
-| **Disconnect** wallet | `await StellarWalletsKit.disconnect()` |
-| Fetch + display **XLM balance** | `server.loadAccount(addr)` → `balances.find(b => b.asset_type === "native")`, rendered in the UI |
-| **Send** an XLM transaction (testnet) | `TransactionBuilder` + `Operation.payment` → `StellarWalletsKit.signTransaction(xdr)` → `server.submitTransaction` |
-| Transaction **feedback** (success/failure + tx hash) | success state renders `res.hash` with a Stellar Expert `view tx ↗` link; failures surface a typed error |
-| **Error handling** | three distinct cases via `connectErr` / `sendErr` — wallet not installed · request rejected · insufficient balance |
-
-```ts
-// connect — open the wallet-select modal, then load the balance
-const { address: addr } = await StellarWalletsKit.authModal();
-setAddress(addr);
-await loadBalance(addr);
-
-// send — build, sign with the connected wallet, submit, surface the tx hash
-const tx = new TransactionBuilder(source, { fee: BASE_FEE, networkPassphrase: NETWORK_PASSPHRASE })
-  .addOperation(Operation.payment({ destination: dest, asset: Asset.native(), amount }))
-  .setTimeout(180).build();
-const { signedTxXdr } = await StellarWalletsKit.signTransaction(tx.toXDR(), {
-  networkPassphrase: NETWORK_PASSPHRASE,
-  address,
-});
-const res = await server.submitTransaction(TransactionBuilder.fromXDR(signedTxXdr, NETWORK_PASSPHRASE));
-setStatus({ kind: "success", msg: "Payment sent — confirmed on testnet ✓", hash: res.hash });
-```
-
-> **Monorepo note for reviewers:** the wallet dApp lives under **`web/`** (Vite · React · TS); `contracts/` holds the unrelated Soroban code. The client-side wallet integration is entirely in `web/src/components/Wallet.tsx` + `web/src/lib/wallet-errors.ts`, not in the contract crates.
-
 ### Screenshots
+
+**Your own treasury (per-user product)** — connect a wallet, deploy your own bounded treasury, fund it, whitelist payees, spend within policy — with analytics & monitoring read from your treasury's on-chain events:
+
+![Your Prism workspace — own treasury, policy limits, analytics & monitoring](docs/screenshots/10-workspace.png)
 
 **The agent dashboard — an AI agent spent real money, safely** (treasury balance, per-task & daily limits, live on-chain settlement):
 
@@ -239,21 +207,9 @@ setStatus({ kind: "success", msg: "Payment sent — confirmed on testnet ✓", h
 
 ![Confidential mode — commitments, proven per-task/daily bounds, on-chain attestation](docs/screenshots/08-confidential.png)
 
-**Multi-wallet connect — StellarWalletsKit** (Freighter · xBull · Albedo · LOBSTR · Rabet · Hana):
-
-![Connect Wallet modal listing the available wallet options](docs/screenshots/03-wallet-options.png)
-
-**Connected wallet → balance → a confirmed payment, verified on-chain:**
-
-| Connected · balance · confirmed payment | Payment successful on Stellar Expert |
-|:---:|:---:|
-| ![Wallet connected, XLM balance, and a confirmed testnet payment](docs/screenshots/01-wallet-send.png) | ![The payment, successful on Stellar Expert](docs/screenshots/02-tx-stellar-expert.png) |
-
 **Mobile responsive** (390 px):
 
-| Agent dashboard | Wallet |
-|:---:|:---:|
-| ![Agent dashboard on mobile](docs/screenshots/05-mobile-dashboard.png) | ![Wallet on mobile](docs/screenshots/04-mobile-wallet.png) |
+![Your Prism workspace on mobile](docs/screenshots/11-mobile-workspace.png)
 
 **Continuous integration** — every push runs three jobs: Soroban contracts (`cargo test`), frontend (Vitest + build), and the x402 + prover package tests.
 
