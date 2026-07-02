@@ -6,8 +6,8 @@ import { HORIZON_URL } from "../config";
 
 const FRIENDBOT_URL = "https://friendbot.stellar.org";
 
-/** Minimum native balance (XLM) to comfortably deploy + fund a treasury. */
-export const MIN_XLM = 5;
+/** Minimum native balance (XLM) to comfortably deploy, fund, and use a treasury. */
+export const MIN_XLM = 20;
 
 /** Native XLM balance of a classic account, or null if the account doesn't exist yet. */
 export async function getXlmBalance(
