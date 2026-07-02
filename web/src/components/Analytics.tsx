@@ -59,11 +59,14 @@ export default function Analytics({ contractId, refreshKey = 0 }: { contractId: 
       </div>
 
       {series.length > 0 && (
-        <div style={bars}>
-          {series.slice(-12).map((p, i) => (
-            <div key={i} title={`${p.xlm} XLM`} style={{ ...bar, height: `${Math.max(5, (p.xlm / max) * 42)}px` }} />
-          ))}
-        </div>
+        <>
+          <div style={{ ...label, marginTop: 10 }}>Spend per payment</div>
+          <div style={bars}>
+            {series.slice(-12).map((p, i) => (
+              <div key={i} title={`${p.xlm} XLM`} style={{ ...bar, height: `${Math.max(5, (p.xlm / max) * 42)}px` }} />
+            ))}
+          </div>
+        </>
       )}
 
       <div style={{ fontSize: 11.5, color: "#7C7C92", marginTop: 8 }}>
@@ -101,8 +104,9 @@ function timeAgo(iso: string): string {
 const label: React.CSSProperties = { fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", color: "#7C7C92" };
 const grid: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 };
 const statBox: React.CSSProperties = { padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" };
-const bars: React.CSSProperties = { display: "flex", alignItems: "flex-end", gap: 4, height: 48, marginTop: 10 };
-const bar: React.CSSProperties = { flex: 1, background: "#FDDA24", borderRadius: 3, minWidth: 4 };
+const bars: React.CSSProperties = { display: "flex", alignItems: "flex-end", gap: 4, height: 48, marginTop: 6 };
+// Fixed-width bars: with only a payment or two, flex-grown bars read as giant buttons.
+const bar: React.CSSProperties = { width: 22, background: "#FDDA24", borderRadius: 3 };
 const refreshBtn: React.CSSProperties = {
   background: "transparent", border: "1px solid rgba(255,255,255,0.14)", color: "#A0A0B8",
   borderRadius: 8, padding: "4px 9px", fontSize: 11.5, cursor: "pointer",
