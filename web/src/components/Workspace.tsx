@@ -14,6 +14,7 @@ import {
   type PrismState,
 } from "../lib/userTreasury";
 import { EXPLORER, fmtUSDC, shortAddr } from "../config";
+import { fundWithFriendbot, getXlmBalance, needsFunding, MIN_XLM } from "../lib/funding";
 import { connectErr } from "../lib/wallet-errors";
 import { trackError, trackViolation } from "../lib/analytics";
 import { logActivity } from "../lib/activity";
@@ -36,6 +37,9 @@ export default function Workspace() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status>({ kind: "idle", msg: "" });
   const [refreshKey, setRefreshKey] = useState(0);
+  // undefined = not checked yet (or Horizon unreachable) → no gate shown; null = no account.
+  const [walletXlm, setWalletXlm] = useState<number | null | undefined>(undefined);
+  const [funding, setFunding] = useState(false);
 
   const [daily, setDaily] = useState("50");
   const [perTask, setPerTask] = useState("10");
@@ -61,6 +65,33 @@ export default function Workspace() {
   useEffect(() => {
     if (address && treasuryId) loadState(treasuryId, address);
   }, [address, treasuryId, loadState]);
+
+  const refreshWalletXlm = useCallback(async (addr: string) => {
+    try {
+      setWalletXlm(await getXlmBalance(addr));
+    } catch {
+      setWalletXlm(undefined);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (address) void refreshWalletXlm(address);
+  }, [address, refreshWalletXlm]);
+
+  const friendbot = useCallback(async () => {
+    if (!address) return;
+    setFunding(true);
+    setStatus({ kind: "info", msg: "Requesting testnet XLM from friendbot…" });
+    try {
+      await fundWithFriendbot(address);
+      await refreshWalletXlm(address);
+      setStatus({ kind: "success", msg: "Wallet funded with testnet XLM ✓" });
+    } catch (e) {
+      setStatus({ kind: "error", msg: errText(e) });
+    } finally {
+      setFunding(false);
+    }
+  }, [address, refreshWalletXlm]);
 
   const connect = useCallback(async () => {
     try {
@@ -107,12 +138,13 @@ export default function Workspace() {
       setFundAmt("");
       setRefreshKey((k) => k + 1);
       await loadState(treasuryId, address);
+      void refreshWalletXlm(address);
     } catch (e) {
       setStatus({ kind: "error", msg: errText(e) });
     } finally {
       setBusy(false);
     }
-  }, [address, treasuryId, fundAmt, loadState]);
+  }, [address, treasuryId, fundAmt, loadState, refreshWalletXlm]);
 
   const whitelist = useCallback(async () => {
     if (!address || !treasuryId) return;
@@ -166,6 +198,24 @@ export default function Workspace() {
         <h1 style={h1}>
           <span style={{ color: "#FDDA24" }}>◭</span> Your Prism
         </h1>
+
+        {address && walletXlm !== undefined && needsFunding(walletXlm) && (
+          <div style={fundBox}>
+            <div style={{ fontSize: 13.5, lineHeight: 1.55 }}>
+              {walletXlm === null
+                ? "Your wallet doesn't exist on testnet yet (0 XLM)."
+                : `Your wallet holds ${walletXlm.toFixed(2)} XLM on testnet.`}{" "}
+              You need ~{MIN_XLM} XLM to deploy and fund a treasury — grab free testnet XLM below.
+            </div>
+            <button
+              style={{ ...primaryBtn, opacity: funding ? 0.6 : 1 }}
+              onClick={friendbot}
+              disabled={funding}
+            >
+              {funding ? "Funding…" : "Get free testnet XLM"}
+            </button>
+          </div>
+        )}
 
         {!address ? (
           <>
@@ -276,6 +326,10 @@ const label: React.CSSProperties = { fontSize: 11, textTransform: "uppercase", l
 const mono: React.CSSProperties = { fontFamily: "ui-monospace, monospace", fontSize: 14, color: "#EDEDF4", textDecoration: "none" };
 const row: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14 };
 const balanceBox: React.CSSProperties = { marginTop: 16, padding: 16, borderRadius: 12, background: "rgba(255,255,255,0.04)" };
+const fundBox: React.CSSProperties = {
+  marginTop: 16, padding: 14, borderRadius: 12,
+  background: "rgba(253,218,36,0.07)", border: "1px solid rgba(253,218,36,0.35)", color: "#EDEDF4",
+};
 const input: React.CSSProperties = {
   width: "100%", boxSizing: "border-box", marginTop: 8, padding: "11px 13px", borderRadius: 10,
   background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.1)", color: "#EDEDF4", fontSize: 14,
