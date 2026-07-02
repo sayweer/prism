@@ -52,6 +52,21 @@ const ADDR_KEY = "prism_wallet_address";
 let connectedAddress: string | null =
   typeof sessionStorage !== "undefined" ? sessionStorage.getItem(ADDR_KEY) : null;
 
+// The nav chip and the views all reflect one connection — notify them on change.
+type AddressListener = (address: string | null) => void;
+const addressListeners = new Set<AddressListener>();
+function notifyAddress(): void {
+  for (const fn of addressListeners) fn(connectedAddress);
+}
+
+/** Subscribe to connect/disconnect changes. Returns an unsubscribe function. */
+export function onAddressChange(fn: AddressListener): () => void {
+  addressListeners.add(fn);
+  return () => {
+    addressListeners.delete(fn);
+  };
+}
+
 /** The currently connected wallet address (persisted across reloads in this tab), or null. */
 export function getAddress(): string | null {
   return connectedAddress;
@@ -63,6 +78,7 @@ export async function connect(): Promise<string> {
   if (!address) throw new Error("No wallet selected.");
   connectedAddress = address;
   sessionStorage.setItem(ADDR_KEY, address);
+  notifyAddress();
   return address;
 }
 
@@ -74,6 +90,7 @@ export async function disconnect(): Promise<void> {
   }
   connectedAddress = null;
   sessionStorage.removeItem(ADDR_KEY);
+  notifyAddress();
 }
 
 /** A contract-client `signTransaction` bound to the connected wallet. */

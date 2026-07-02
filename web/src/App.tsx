@@ -27,6 +27,8 @@ const Dashboard = lazyWithReload(() => import("./components/Dashboard"));
 const Wallet = lazyWithReload(() => import("./components/Wallet"));
 const ActivityFeed = lazyWithReload(() => import("./components/ActivityFeed"));
 const Workspace = lazyWithReload(() => import("./components/Workspace"));
+// AppNav pulls in the wallet kit — keep it lazy so the landing bundle stays light.
+const AppNav = lazyWithReload(() => import("./components/AppNav"));
 
 type View = "landing" | "dashboard" | "wallet" | "activity" | "workspace";
 
@@ -63,20 +65,9 @@ export default function App() {
       {/* App-level nav only on the inner views — the landing has its own floating
           navbar (Wallet/Activity live there now), so this would just clutter it. */}
       {view !== "landing" && (
-        <nav style={nav}>
-          <button style={navBtn(view === "workspace")} onClick={() => go("workspace")}>
-            My Prism
-          </button>
-          <button style={navBtn(view === "dashboard")} onClick={() => go("dashboard")}>
-            Agent demo
-          </button>
-          <button style={navBtn(view === "wallet")} onClick={() => go("wallet")}>
-            Wallet
-          </button>
-          <button style={navBtn(view === "activity")} onClick={() => go("activity")}>
-            Activity
-          </button>
-        </nav>
+        <Suspense fallback={null}>
+          <AppNav view={view} onGo={go} />
+        </Suspense>
       )}
 
       <Suspense fallback={null}>
@@ -144,29 +135,3 @@ export default function App() {
   );
 }
 
-const nav: React.CSSProperties = {
-  position: "fixed",
-  top: 16,
-  right: 16,
-  zIndex: 1000,
-  display: "flex",
-  flexWrap: "wrap", // small screens: wrap instead of overflowing off the left edge
-  justifyContent: "flex-end",
-  maxWidth: "calc(100vw - 32px)",
-  gap: 6,
-  padding: 4,
-  borderRadius: 12,
-  background: "rgba(18,18,28,0.6)",
-  border: "1px solid rgba(255,255,255,0.08)",
-  backdropFilter: "blur(8px)",
-};
-const navBtn = (active: boolean): React.CSSProperties => ({
-  padding: "7px 13px",
-  borderRadius: 9,
-  border: "none",
-  cursor: "pointer",
-  fontSize: 13,
-  fontWeight: 600,
-  background: active ? "rgba(124,58,237,0.25)" : "transparent",
-  color: active ? "#EDEDF4" : "#A0A0B8",
-});

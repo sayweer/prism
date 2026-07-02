@@ -2,7 +2,7 @@
 // fund it → whitelist payees → spend, all signed by your wallet. The contract enforces
 // the policy; rejections (#1..#4) are surfaced as "blocked by policy" — the product working.
 import { useCallback, useEffect, useState } from "react";
-import { connect as kitConnect, getAddress, walletSignerFor } from "../lib/walletKit";
+import { connect as kitConnect, getAddress, onAddressChange, walletSignerFor } from "../lib/walletKit";
 import { getTreasuryId, setTreasuryId } from "../lib/treasuryStore";
 import {
   addPayee,
@@ -63,6 +63,17 @@ export default function Workspace() {
       setLoading(false);
     }
   }, []);
+
+  // Stay in sync with the global connection (nav chip connect/disconnect).
+  useEffect(
+    () =>
+      onAddressChange((a) => {
+        setAddress(a);
+        setTreasuryIdState(a ? getTreasuryId(a) : null);
+        if (!a) setState(null);
+      }),
+    [],
+  );
 
   useEffect(() => {
     if (address && treasuryId) loadState(treasuryId, address);

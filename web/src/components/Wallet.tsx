@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Asset, BASE_FEE, Horizon, Operation, TransactionBuilder } from "@stellar/stellar-sdk";
 import { EXPLORER, HORIZON_URL, NETWORK_PASSPHRASE, shortAddr } from "../config";
 import { connectErr, sendErr } from "../lib/wallet-errors";
-import { kit, connect as kitConnect, disconnect as kitDisconnect, getAddress } from "../lib/walletKit";
+import { kit, connect as kitConnect, disconnect as kitDisconnect, getAddress, onAddressChange } from "../lib/walletKit";
 
 const server = new Horizon.Server(HORIZON_URL);
 
@@ -36,6 +36,16 @@ export default function Wallet() {
   useEffect(() => {
     if (address) void loadBalance(address);
   }, [address, loadBalance]);
+
+  // Stay in sync with the global connection (nav chip connect/disconnect).
+  useEffect(
+    () =>
+      onAddressChange((a) => {
+        setAddress(a);
+        if (!a) setBalance(null);
+      }),
+    [],
+  );
 
   const connect = useCallback(async () => {
     setStatus({ kind: "info", msg: "Choose a wallet…" });
