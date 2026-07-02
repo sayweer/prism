@@ -49,7 +49,7 @@ export default function App() {
           <button style={navBtn(view === "workspace")} onClick={() => go("workspace")}>
             My Prism
           </button>
-          <button style={navBtn(view === "dashboard")} onClick={() => go("landing")}>
+          <button style={navBtn(view === "dashboard")} onClick={() => go("dashboard")}>
             Agent demo
           </button>
           <button style={navBtn(view === "wallet")} onClick={() => go("wallet")}>
@@ -132,6 +132,9 @@ const nav: React.CSSProperties = {
   right: 16,
   zIndex: 1000,
   display: "flex",
+  flexWrap: "wrap", // small screens: wrap instead of overflowing off the left edge
+  justifyContent: "flex-end",
+  maxWidth: "calc(100vw - 32px)",
   gap: 6,
   padding: 4,
   borderRadius: 12,

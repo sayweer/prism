@@ -352,7 +352,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-const wrap: React.CSSProperties = { minHeight: "100vh", display: "grid", placeItems: "center", padding: 24 };
+// Top padding clears the fixed app nav on phones (the card can reach the viewport top).
+const wrap: React.CSSProperties = { minHeight: "100vh", display: "grid", placeItems: "center", padding: "84px 16px 24px" };
 const card: React.CSSProperties = {
   width: "100%", maxWidth: 480, padding: 28, borderRadius: 18,
   background: "rgba(18,18,28,0.72)", border: "1px solid rgba(255,255,255,0.08)",

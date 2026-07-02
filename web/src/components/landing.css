@@ -205,6 +205,14 @@
   .lx .check{ grid-template-columns:34px 1fr; }
   .lx .check p{ grid-column:2; }
   .lx .proofwide .big{ text-align:left; }
-  .lx .nav .links a, .lx .nav .links .navlink{ display:none; }
+  /* Compact nav: keep the in-app views (Demo/Wallet/Activity) reachable on phones;
+     drop only the informational extras (testnet badge, How it works, GitHub). */
+  .lx .nav{ gap:14px; padding:9px 9px 9px 14px; }
+  .lx .nav .brand{ font-size:17px; gap:8px; }
+  .lx .nav .glyph{ width:22px; height:22px; }
+  .lx .nav .links{ gap:13px; }
+  .lx .nav .links a, .lx .nav .links .live{ display:none; }
+  .lx .nav .links .navlink{ font-size:12.5px; }
+  .lx .nav .navcta{ padding:8px 13px; font-size:12.5px; }
 }
 @media(prefers-reduced-motion:reduce){ .cine__glow, .cine__rays{ animation:none } }
