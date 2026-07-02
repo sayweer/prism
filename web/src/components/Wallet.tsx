@@ -187,7 +187,7 @@ export default function Wallet() {
 }
 
 // --- minimal functional styling (premium re-design is a later phase with Gemini) ---
-const wrap: React.CSSProperties = { minHeight: "100vh", display: "grid", placeItems: "center", padding: 24 };
+const wrap: React.CSSProperties = { minHeight: "100vh", display: "grid", placeItems: "center", padding: "84px 16px 24px" };
 const card: React.CSSProperties = {
   width: "100%", maxWidth: 460, padding: 28, borderRadius: 18,
   background: "rgba(18,18,28,0.72)", border: "1px solid rgba(255,255,255,0.08)",

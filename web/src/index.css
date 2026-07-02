@@ -268,7 +268,7 @@ button{ font-family:inherit; }
 .divider .tag .gem{ width:9px; height:9px; transform:rotate(45deg); background:var(--spectrum); box-shadow:0 0 14px rgba(124,58,237,.7); }
 
 /* ===================== DASHBOARD ===================== */
-.dash{ padding:34px 0 90px; }
+.dash{ padding:96px 0 90px; } /* top padding clears the fixed app nav */
 .dash__head{ display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; }
 .dash__title{ font-family:var(--display); font-weight:600; font-size:clamp(26px,3.4vw,38px); letter-spacing:-.02em; margin:8px 0 0; }
 

@@ -126,7 +126,7 @@ function timeAgo(iso: string): string {
   return `${Math.floor(s / 86400)}d ago`;
 }
 
-const wrap: React.CSSProperties = { minHeight: "100vh", display: "grid", placeItems: "center", padding: 24 };
+const wrap: React.CSSProperties = { minHeight: "100vh", display: "grid", placeItems: "center", padding: "84px 16px 24px" };
 const card: React.CSSProperties = {
   width: "100%", maxWidth: 560, padding: 28, borderRadius: 18,
   background: "rgba(18,18,28,0.72)", border: "1px solid rgba(255,255,255,0.08)",
