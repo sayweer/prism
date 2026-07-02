@@ -3,18 +3,20 @@
 // testnet XLM balance and send an XLM payment with success/failure + tx-hash feedback.
 // Three error types are surfaced: wallet not installed, request rejected, insufficient
 // balance. (Premium visual pass is a later phase with Gemini; this is the functional layer.)
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Asset, BASE_FEE, Horizon, Operation, TransactionBuilder } from "@stellar/stellar-sdk";
 import { EXPLORER, HORIZON_URL, NETWORK_PASSPHRASE, shortAddr } from "../config";
 import { connectErr, sendErr } from "../lib/wallet-errors";
-import { kit, connect as kitConnect, disconnect as kitDisconnect } from "../lib/walletKit";
+import { kit, connect as kitConnect, disconnect as kitDisconnect, getAddress } from "../lib/walletKit";
 
 const server = new Horizon.Server(HORIZON_URL);
 
 type Status = { kind: "idle" | "info" | "success" | "error"; msg: string; hash?: string };
 
 export default function Wallet() {
-  const [address, setAddress] = useState<string | null>(null);
+  // Hydrate from the shared kit state — a wallet connected in the Workspace (or before
+  // a reload) is the same session-wide connection, so show it here too.
+  const [address, setAddress] = useState<string | null>(getAddress());
   const [balance, setBalance] = useState<string | null>(null);
   const [dest, setDest] = useState("");
   const [amount, setAmount] = useState("");
@@ -30,6 +32,10 @@ export default function Wallet() {
       setBalance("0"); // account not yet funded on testnet
     }
   }, []);
+
+  useEffect(() => {
+    if (address) void loadBalance(address);
+  }, [address, loadBalance]);
 
   const connect = useCallback(async () => {
     setStatus({ kind: "info", msg: "Choose a wallet…" });

@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState, type ComponentType } from "react";
+import { Suspense, lazy, useEffect, useState, type ComponentType } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Background from "./components/Background";
 import Landing from "./components/Landing";
@@ -30,11 +30,29 @@ const Workspace = lazyWithReload(() => import("./components/Workspace"));
 
 type View = "landing" | "dashboard" | "wallet" | "activity" | "workspace";
 
+// Views live in the URL hash so a refresh (or back/forward) keeps the current view
+// instead of dumping the user back on the landing page.
+const VIEWS: readonly View[] = ["landing", "dashboard", "wallet", "activity", "workspace"];
+const viewFromHash = (): View => {
+  const h = window.location.hash.slice(1);
+  return (VIEWS as readonly string[]).includes(h) ? (h as View) : "landing";
+};
+
 export default function App() {
-  const [view, setView] = useState<View>("landing");
+  const [view, setView] = useState<View>(viewFromHash);
+
+  useEffect(() => {
+    const onHash = () => {
+      setView(viewFromHash());
+      window.scrollTo({ top: 0, behavior: "auto" });
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
 
   const go = (v: View) => {
-    setView(v);
+    window.location.hash = v === "landing" ? "" : v; // hashchange drives setView
+    setView(v); // and set directly so "#" edge cases (landing) still switch
     window.scrollTo({ top: 0, behavior: "auto" });
   };
 
