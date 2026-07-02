@@ -47,8 +47,16 @@ export default function ActivityFeed() {
       try {
         const latest = await server.getLatestLedger();
         const start = Math.max(1, latest.sequence - 17280); // ~last day of activity (5s ledgers)
-        const page = await fetchEventsPage(server, { startLedger: start, contractIds });
-        setEvents(dedupe(page.events.reverse()).slice(0, MAX_ITEMS));
+        // getEvents scans ~10k ledgers per call, so a day-wide window spans multiple
+        // pages — page through to the head up front, or the newest events (past the
+        // first, often empty, page) never render and the feed looks dead.
+        let page = await fetchEventsPage(server, { startLedger: start, contractIds });
+        let all = page.events;
+        for (let i = 0; i < 3 && page.cursor; i++) {
+          page = await fetchEventsPage(server, { cursor: page.cursor, contractIds });
+          all = [...all, ...page.events];
+        }
+        setEvents(dedupe(all.reverse()).slice(0, MAX_ITEMS));
         cursor = page.cursor;
         setState("live");
         timer = setTimeout(tick, POLL_MS);
