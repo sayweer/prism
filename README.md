@@ -35,6 +35,8 @@ Prism's bounded-treasury core predates this hackathon (built at IBW 2026). **Eve
 
 Also built in this window (the open-economy trust layer): reputation-gated payees, outcome-bound escrow, and the bounded x402 buyer. Every item is in the git history and verified on testnet (links throughout this README).
 
+**Where the ZK is load-bearing** — a judge's map: the [Circom circuit](circuits/circuits/compliance.circom) proves per-task + daily bounds, Poseidon commitment binding, and Merkle whitelist membership; the [on-chain verifier](contracts/compliance_verifier/src/lib.rs) runs the real BN254 pairing check through Soroban's native host functions (Protocol 25 "X-Ray") and rejects any proof that doesn't match the owner's **anchored policy** or that **replays** an old period — a valid proof is the *only* way to produce a `ComplianceAttested` event. Proofs: [live verify tx](https://stellar.expert/explorer/testnet/tx/4438c94952d6d06fbf6b205e07be1c28ea33c5e1422a5323e93572788b9cac2a) · a live replay-**rejected** proof in [`DEPLOYMENT.md`](DEPLOYMENT.md). And since submissions opened, the treasury this layer attests over became a **live per-user product with real testnet users** ([roadmap](ROADMAP.md) · [security](SECURITY.md)).
+
 ---
 
 ## TL;DR
