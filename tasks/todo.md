@@ -1,3 +1,15 @@
+# Kova 2 — Dokümantasyon / kredibilite (2026-07-03) ✅
+
+- [x] SECURITY.md — güvenlik modeli + 2026-06-03 audit bulgularının durumu (fixed/open)
+      + known limitations + vulnerability disclosure yolu
+- [x] ROADMAP.md — M1-M5 milestone'ları (Startup Track submission için öne çekildi)
+- [x] README "real USDC" iddiası düzeltildi (testnet USDC + XLM gerçeği + M3 yolu)
+- [x] CHANGELOG.md — 0.1.0 (IBW) → 0.2.0 (ZK+trust) → 0.3.0 (per-user) → 0.3.1 (onboarding)
+- [x] web/README.md — Vite boilerplate yerine gerçek dev dokümanı
+- [x] supabase/migrations/0001 — feedback+activity şeması + insert-only RLS repo'da
+- [ ] (ertelendi) lint borcu — 24 hata, çoğu generated treasuryClient.ts + eski
+      setState-in-effect kalıpları; CI gate'lemiyor, davranış riski nedeniyle ayrı iş
+
 # Kova 1 — 10-kullanıcı push'u öncesi onboarding düzeltmeleri (2026-07-02)
 
 Hedef: WhatsApp'tan gelen sıfır-bakiyeli, telefonlu, ilk-kez kullanıcı akışı baştan sona
