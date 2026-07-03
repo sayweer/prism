@@ -44,7 +44,7 @@ Also built in this window (the open-economy trust layer): reputation-gated payee
 - **Fund** — earmark a budget per agent via zero-cost Stellar **muxed sub-addresses** — no memos, no new accounts.
 - **Trust + outcome** — pay any agent above an earned **reputation** threshold (not just a static whitelist), **escrow** funds for pay-on-delivery, and cap an agent's **x402** pay-per-use API spend.
 - **Prove (ZK)** — confidential mode proves the agent stayed within policy in zero-knowledge, [verified on-chain](https://stellar.expert/explorer/testnet/tx/4438c94952d6d06fbf6b205e07be1c28ea33c5e1422a5323e93572788b9cac2a), revealing no amount or payee.
-- **Live** — deployed on Stellar testnet, paying real USDC and rejecting real exploits. `cargo test -p treasury` → **14/14**.
+- **Live** — deployed on Stellar testnet, settling real on-chain payments and rejecting real exploits. The demo pays testnet USDC (a test-issued asset); the per-user product runs on native testnet XLM. Circle USDC is the mainnet path ([roadmap M3](ROADMAP.md)). `cargo test -p treasury` → **14/14**.
 
 ## The problem
 
@@ -241,10 +241,12 @@ docs/                           narrative + assets, design spec & plan
 
 ## Security
 
-- **Non-custodial** — USDC never leaves the owner's own contract; Prism cannot move funds outside the policy.
+- **Non-custodial** — funds never leave the owner's own contract; Prism cannot move funds outside the policy.
 - **Checks-effects-interactions** — accounting is written before the transfer, so a failed/reentrant transfer reverts the whole call atomically.
 - **No front-runnable init** — the policy is set atomically in the constructor at deploy time.
 - **Testnet-only key** — the demo's embedded agent key holds no real value, and a config guard blocks loading it on any non-testnet network.
+
+Full security model, audit-finding status, known limitations, and how to report a vulnerability: [`SECURITY.md`](SECURITY.md).
 
 ## Team
 
