@@ -14,7 +14,7 @@ A non-custodial Soroban treasury that lets a business hand an autonomous AI agen
 ![Tests](https://img.shields.io/badge/tests-treasury_14%2F14_·_circuit_5%2F5_·_verifier_4%2F4-FDDA24?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-3a3a3a?style=flat-square)
 
-**[▶ Live demo](https://prism-stellar.vercel.app) · [🎥 Demo video](https://youtu.be/R7mw9ZTh94U) · [🎤 Pitch deck](https://deck-bice-omega.vercel.app) · [🔗 Contract on Stellar Expert](https://stellar.expert/explorer/testnet/contract/CAYWNXHANRY5GSJAZOR4YTKBKNOKTCITE52ZRKDKCAWLDTYWFFVFSPAZ) · [📄 Deployment & proofs](DEPLOYMENT.md)**
+**[▶ Live demo](https://prism-stellar.vercel.app) · [🎥 Demo video](https://youtu.be/R7mw9ZTh94U) · [🎤 Pitch deck](https://deck-bice-omega.vercel.app) · [🗺 Roadmap](ROADMAP.md) · [🔗 Contract on Stellar Expert](https://stellar.expert/explorer/testnet/contract/CAYWNXHANRY5GSJAZOR4YTKBKNOKTCITE52ZRKDKCAWLDTYWFFVFSPAZ) · [📄 Deployment & proofs](DEPLOYMENT.md)**
 
 <img src="docs/hero.png" alt="Prism — the wallet your AI agent can't drain" width="840" />
 
