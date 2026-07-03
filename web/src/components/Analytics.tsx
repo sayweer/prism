@@ -21,14 +21,25 @@ export default function Analytics({ contractId, refreshKey = 0 }: { contractId: 
     (async () => {
       try {
         const server = new rpc.Server(RPC_URL);
-        const latest = await server.getLatestLedger();
-        // getEvents returns a single bounded page (~10k-ledger span); too wide a start
-        // makes a recent payment land beyond page one and get missed. ~12h keeps it on
-        // the first page (verified: latest-9000 returns the event, latest-17280 returns 0).
-        const start = Math.max(1, latest.sequence - 9000);
-        const page = await fetchEventsPage(server, { contractIds: [contractId], startLedger: start });
+        // Read the treasury's WHOLE retained history, not a half-day window — otherwise a
+        // user returning a day later sees zeroed analytics. getEvents scans ~10k ledgers
+        // per call, so start at the RPC's oldest retained ledger and page to the head.
+        let start = 1;
+        try {
+          const health = await server.getHealth();
+          start = Math.max(1, (health.oldestLedger ?? 1) + 1);
+        } catch {
+          const latest = await server.getLatestLedger();
+          start = Math.max(1, latest.sequence - 9000);
+        }
+        let page = await fetchEventsPage(server, { contractIds: [contractId], startLedger: start });
+        let all = page.events;
+        for (let i = 0; i < 15 && page.cursor; i++) {
+          page = await fetchEventsPage(server, { cursor: page.cursor, contractIds: [contractId] });
+          all = [...all, ...page.events];
+        }
         if (alive) {
-          setEvents(page.events);
+          setEvents(all);
           setState("ready");
         }
       } catch {
