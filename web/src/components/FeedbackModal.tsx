@@ -7,6 +7,7 @@ import {
 } from "../lib/feedback";
 
 const FEATURES: { id: ValuableFeature; label: string }[] = [
+  { id: "own_treasury", label: "Own treasury (per-user)" },
   { id: "bounded", label: "Bounded limits" },
   { id: "confidential_zk", label: "Confidential ZK" },
   { id: "x402", label: "x402" },
@@ -65,7 +66,7 @@ export default function FeedbackModal({ open, onClose }: { open: boolean; onClos
           <p style={muted}>Your feedback was recorded — it directly shapes where Prism goes next.</p>
         ) : (
           <>
-            <Field label="Overall rating">
+            <Field label="Overall rating" required>
               <div style={{ display: "flex", gap: 8 }}>
                 {[1, 2, 3, 4, 5].map((n) => (
                   <button
@@ -80,7 +81,7 @@ export default function FeedbackModal({ open, onClose }: { open: boolean; onClos
               </div>
             </Field>
 
-            <Field label="Most valuable feature">
+            <Field label="Most valuable feature" required>
               <div style={wrapRow}>
                 {FEATURES.map((f) => (
                   <button key={f.id} style={pill(feature === f.id)} onClick={() => setFeature(f.id)} type="button">
@@ -90,7 +91,7 @@ export default function FeedbackModal({ open, onClose }: { open: boolean; onClos
               </div>
             </Field>
 
-            <Field label="What should we improve or add?">
+            <Field label="What should we improve or add?" required>
               <textarea
                 style={textarea}
                 rows={3}
@@ -101,7 +102,7 @@ export default function FeedbackModal({ open, onClose }: { open: boolean; onClos
               />
             </Field>
 
-            <Field label="Would you use this in production?">
+            <Field label="Would you use this in production?" required>
               <div style={{ display: "flex", gap: 8 }}>
                 {USE.map((u) => (
                   <button key={u.id} style={pill(use === u.id)} onClick={() => setUse(u.id)} type="button">
@@ -112,7 +113,7 @@ export default function FeedbackModal({ open, onClose }: { open: boolean; onClos
             </Field>
 
             <Field label="Name / handle (optional)">
-              <input style={input} placeholder="@you on Discord or X" value={handle} onChange={(e) => setHandle(e.target.value)} />
+              <input style={input} placeholder="@you on Telegram / X" value={handle} onChange={(e) => setHandle(e.target.value)} />
             </Field>
 
             <Field label="Wallet (optional)">
@@ -131,10 +132,13 @@ export default function FeedbackModal({ open, onClose }: { open: boolean; onClos
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div style={{ marginTop: 16 }}>
-      <div style={fieldLabel}>{label}</div>
+      <div style={fieldLabel}>
+        {label}
+        {required && <span style={{ color: "#FDDA24", marginLeft: 3 }}>*</span>}
+      </div>
       <div style={{ marginTop: 8 }}>{children}</div>
     </div>
   );

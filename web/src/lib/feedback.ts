@@ -1,6 +1,6 @@
 import { supabase, supabaseConfigured } from "./supabase";
 
-export type ValuableFeature = "bounded" | "confidential_zk" | "x402" | "escrow_reputation";
+export type ValuableFeature = "own_treasury" | "bounded" | "confidential_zk" | "x402" | "escrow_reputation";
 export type WouldUse = "yes" | "maybe" | "no";
 
 export interface FeedbackInput {
@@ -12,23 +12,23 @@ export interface FeedbackInput {
   walletAddress?: string;
 }
 
-const FEATURES: ValuableFeature[] = ["bounded", "confidential_zk", "x402", "escrow_reputation"];
+const FEATURES: ValuableFeature[] = ["own_treasury", "bounded", "confidential_zk", "x402", "escrow_reputation"];
 const USE: WouldUse[] = ["yes", "maybe", "no"];
 
 export function validateFeedback(input: Partial<FeedbackInput>): string | null {
   const { rating, valuableFeature, improvementText, wouldUseProduction, handle, walletAddress } = input;
-  if (!rating || !Number.isInteger(rating) || rating < 1 || rating > 5) {
-    return "Please give a rating from 1 to 5.";
-  }
-  if (!valuableFeature || !FEATURES.includes(valuableFeature)) {
-    return "Please pick the most valuable feature.";
-  }
   const text = (improvementText ?? "").trim();
-  if (text.length < 1) return "Please tell us what to improve.";
+
+  // Collect every missing required field into ONE message — erroring one field at a
+  // time makes impatient users close the modal before their feedback is saved.
+  const missing: string[] = [];
+  if (!rating || !Number.isInteger(rating) || rating < 1 || rating > 5) missing.push("a 1-5 rating");
+  if (!valuableFeature || !FEATURES.includes(valuableFeature)) missing.push("the most valuable feature");
+  if (text.length < 1) missing.push("what we should improve");
+  if (!wouldUseProduction || !USE.includes(wouldUseProduction)) missing.push("whether you'd use it in production");
+  if (missing.length > 0) return `Please add: ${missing.join(" · ")}.`;
+
   if (text.length > 2000) return "Please keep feedback under 2000 characters.";
-  if (!wouldUseProduction || !USE.includes(wouldUseProduction)) {
-    return "Please answer whether you'd use this in production.";
-  }
   if (handle && handle.length > 80) return "Handle is too long (max 80).";
   if (walletAddress && walletAddress.length > 64) return "Wallet address looks too long.";
   return null;

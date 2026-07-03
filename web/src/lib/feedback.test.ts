@@ -33,4 +33,14 @@ describe("validateFeedback", () => {
   it("rejects an over-long handle", () => {
     expect(validateFeedback({ ...valid, handle: "x".repeat(81) })).toMatch(/handle/i);
   });
+  it("accepts the own_treasury feature", () => {
+    expect(validateFeedback({ ...valid, valuableFeature: "own_treasury" })).toBeNull();
+  });
+  it("lists every missing required field in one message", () => {
+    const msg = validateFeedback({});
+    expect(msg).toMatch(/rating/i);
+    expect(msg).toMatch(/feature/i);
+    expect(msg).toMatch(/improve/i);
+    expect(msg).toMatch(/production/i);
+  });
 });
