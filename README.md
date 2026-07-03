@@ -152,7 +152,7 @@ Three upgrades take Prism from a walled garden to the open agent economy — eac
 
 ## Use your own treasury (per-user product)
 
-Beyond the spectator demo, **connect a wallet and run your own** bounded treasury — [open the app](https://prism-stellar.vercel.app) and pick **Open app**. Türkçe hızlı başlangıç: [`docs/TRY-IT-TR.md`](docs/TRY-IT-TR.md).
+Beyond the spectator demo, **connect a wallet and run your own** bounded treasury — [open the app](https://prism-stellar.vercel.app) and pick **Open app**. Quickstart guides: [English](docs/TRY-IT.md) · [Türkçe](docs/TRY-IT-TR.md).
 
 1. **Install a Stellar wallet** — e.g. [Freighter](https://www.freighter.app/), switched to **Testnet** in its settings.
 2. **Connect** — any Stellar wallet, testnet.

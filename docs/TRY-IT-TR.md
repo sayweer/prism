@@ -1,5 +1,7 @@
 # Prism'i Dene — 5 Dakikalık Rehber (Testnet)
 
+*English version: [TRY-IT.md](TRY-IT.md)*
+
 **Prism nedir?** AI agent'lara güvenle harcama yetkisi veren, Stellar üzerinde çalışan
 sınırlı bir hazine (bounded treasury): günlük limit + işlem-başı limit + payee whitelist'ini
 **kontrat** uygular — model ne kadar "ikna edilirse edilsin" limit dışına para çıkamaz.
