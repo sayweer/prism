@@ -332,10 +332,17 @@ export default function Landing({
         <section className="final">
           <Reveal><span className="eyebrow">Live on Stellar testnet</span></Reveal>
           <RevealLines tag="h2" delay={0.05} lines={[<>It's already <em>live.</em></>]} />
-          <Reveal delay={0.15}><p>Deployed on testnet — paying real USDC, proving compliance in zero-knowledge, rejecting real exploits.</p></Reveal>
+          <Reveal delay={0.15}>
+            <p>
+              Deployed on testnet — settling real on-chain payments, proving compliance in
+              zero-knowledge, rejecting real exploits. And it's not just a demo:{" "}
+              <b>connect a wallet and deploy your own bounded treasury in minutes.</b>
+            </p>
+          </Reveal>
           <Reveal delay={0.22}>
             <div className="cta">
-              <button className="btn btn--p" onClick={onLaunch}>Launch live demo →</button>
+              <button className="btn btn--p" onClick={onWorkspace}>Create your own treasury →</button>
+              <button className="btn" onClick={onLaunch}>Launch live demo</button>
               <a className="btn" href={contractUrl(TREASURY_ID)} target="_blank" rel="noreferrer">Treasury contract</a>
             </div>
           </Reveal>
@@ -344,7 +351,7 @@ export default function Landing({
         {/* footer */}
         <footer className="foot">
           <div className="b"><span className="glyph" /> Prism</div>
-          <div className="op"><i /> System operational · Build On Stellar · IBW 2026</div>
+          <div className="op"><i /> System operational · Build On Stellar IBW 2026 → Real-World ZK 2026</div>
           <div className="op" style={{ color: "var(--lx-dim)" }}>Bekir Erdem · Seyit Ali Değirmen</div>
         </footer>
       </main>
