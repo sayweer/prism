@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import Background from "./components/Background";
 import Landing from "./components/Landing";
 import FeedbackButton from "./components/FeedbackButton";
+import { logFunnel } from "./lib/funnel";
 
 // Heavy views (they pull in the large @stellar/stellar-sdk) are code-split so the
 // landing loads fast — stellar-sdk only downloads when you open them.
@@ -42,6 +43,12 @@ const viewFromHash = (): View => {
 
 export default function App() {
   const [view, setView] = useState<View>(viewFromHash);
+
+  // One page_view per visit (device-tagged) — the top of the funnel, so connect-clicks
+  // and deploys can be read as a fraction of who actually arrived.
+  useEffect(() => {
+    logFunnel({ event: "page_view" });
+  }, []);
 
   useEffect(() => {
     const onHash = () => {

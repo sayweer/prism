@@ -10,6 +10,7 @@ import { RabetModule } from "@creit.tech/stellar-wallets-kit/modules/rabet";
 import { HanaModule } from "@creit.tech/stellar-wallets-kit/modules/hana";
 import { NETWORK_PASSPHRASE } from "../config";
 import { makeWalletSigner, type ContractSigner } from "./walletSigner";
+import { logFunnel } from "./funnel";
 
 // One-time kit setup. `authModal()` lists these as the available "wallet options".
 StellarWalletsKit.init({
@@ -72,14 +73,37 @@ export function getAddress(): string | null {
   return connectedAddress;
 }
 
-/** Open the wallet-select modal and return the chosen address. Throws if none selected. */
+/** Open the wallet-select modal and return the chosen address. Throws if none selected.
+ *  Funnel-instrumented: a `connect_click` on open, then a `connect_result` — success (a
+ *  wallet bound), error (modal rejected, e.g. no compatible wallet / user aborted), or
+ *  dismissed (resolved with no wallet). This is what makes the connect-wall drop-off visible. */
 export async function connect(): Promise<string> {
-  const { address } = await StellarWalletsKit.authModal();
-  if (!address) throw new Error("No wallet selected.");
-  connectedAddress = address;
-  sessionStorage.setItem(ADDR_KEY, address);
-  notifyAddress();
-  return address;
+  logFunnel({ event: "connect_click" });
+  let address: string | undefined;
+  try {
+    const res = await StellarWalletsKit.authModal();
+    address = (res as { address?: string }).address;
+    if (address) {
+      connectedAddress = address;
+      sessionStorage.setItem(ADDR_KEY, address);
+      notifyAddress();
+      logFunnel({
+        event: "connect_result",
+        outcome: "success",
+        walletId: (res as { walletId?: string }).walletId,
+      });
+      return address;
+    }
+  } catch (e) {
+    logFunnel({
+      event: "connect_result",
+      outcome: "error",
+      detail: e instanceof Error ? e.message : String(e),
+    });
+    throw e;
+  }
+  logFunnel({ event: "connect_result", outcome: "dismissed" });
+  throw new Error("No wallet selected.");
 }
 
 export async function disconnect(): Promise<void> {
