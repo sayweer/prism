@@ -1,5 +1,23 @@
 import { describe, it, expect } from "vitest";
-import { connectErr, sendErr } from "./wallet-errors";
+import { connectErr, errText, sendErr } from "./wallet-errors";
+
+describe("errText", () => {
+  it("returns an Error's message", () => {
+    expect(errText(new Error("boom"))).toBe("boom");
+  });
+  it("extracts a plain SDK error object's message instead of [object Object]", () => {
+    // StellarWalletsKit's authModal rejects with a plain object, not an Error — the
+    // reason funnel detail was logging "[object Object]" until it used this helper.
+    expect(errText({ message: "Modal closed" })).toBe("Modal closed");
+    expect(errText({ message: "Modal closed" })).not.toBe("[object Object]");
+  });
+  it("returns a string error as-is", () => {
+    expect(errText("plain string error")).toBe("plain string error");
+  });
+  it("returns empty (never [object Object]) for a message-less object", () => {
+    expect(errText({})).toBe("");
+  });
+});
 
 describe("connectErr", () => {
   it("maps a not-installed wallet", () => {

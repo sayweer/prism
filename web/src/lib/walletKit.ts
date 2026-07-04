@@ -11,6 +11,7 @@ import { HanaModule } from "@creit.tech/stellar-wallets-kit/modules/hana";
 import { NETWORK_PASSPHRASE } from "../config";
 import { makeWalletSigner, type ContractSigner } from "./walletSigner";
 import { logFunnel } from "./funnel";
+import { errText } from "./wallet-errors";
 
 // One-time kit setup. `authModal()` lists these as the available "wallet options".
 StellarWalletsKit.init({
@@ -98,7 +99,7 @@ export async function connect(): Promise<string> {
     logFunnel({
       event: "connect_result",
       outcome: "error",
-      detail: e instanceof Error ? e.message : String(e),
+      detail: errText(e), // SDK rejects with a plain object; String(e) would be "[object Object]"
     });
     throw e;
   }
