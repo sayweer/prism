@@ -180,6 +180,25 @@ Every action is signed by your own wallet — non-custodial end to end. In-app f
 
 The first treasury is the transparent "public mode" demo; **Treasury v2** adds the reputation gate + escrow. Full addresses + verified on-chain results: [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
+## User feedback & how we act on it
+
+Prism is dogfooded by real testers. Structured feedback is collected through a **[Google Form](https://forms.gle/7gzJWwte52SmbXei7)** — name, email, Stellar wallet, rating, most‑valuable feature, production intent, and improvements — with responses flowing to a private review sheet (wallet/email kept private; only aggregates are shared here).
+
+**Early signal:** 4.7 / 5 average, 100% *would use in production* — top-rated feature so far is the **bounded treasury**, and testers explicitly asked for deeper agent tooling (e.g. *"openclaw skills"*, @yamancan of Trion Labs).
+
+**What testers hit → what we shipped** (the onboarding wave came straight from a first-time user getting stuck on live testnet):
+
+| Feedback | What we shipped | Commit |
+|---|---|---|
+| Zero-balance first-timers stalled before any action — no way to get testnet XLM | Funding gate + one-tap friendbot button + balance check | [`3b32062`](https://github.com/Bekirerdem/prism/commit/3b32062) |
+| The treasury contract ID was easy to lose after deploy | "Copy ID" + save reminder + StrKey validation | [`19d563c`](https://github.com/Bekirerdem/prism/commit/19d563c) |
+| First run was unclear — *what do I whitelist / pay?* | "Use the sample vendor" prefill + whitelist→spend autofill + human-readable errors | [`c0c3680`](https://github.com/Bekirerdem/prism/commit/c0c3680) |
+| Mobile visitors couldn't see the nav | Compact, responsive mobile nav | [`528d22d`](https://github.com/Bekirerdem/prism/commit/528d22d) |
+| *"more agent action options"* (production intent: yes) | On the roadmap → agent tooling / MCP integration ([`ROADMAP.md`](ROADMAP.md) M2/M4) |
+| *"openclaw skills"* — richer agent capability | On the roadmap → stellar-8004 + OpenClaw skill ([`ROADMAP.md`](ROADMAP.md) M4) |
+
+**Tried Prism?** Tell us what to fix next: **[share feedback →](https://forms.gle/7gzJWwte52SmbXei7)**
+
 ## Quickstart
 
 ```bash
