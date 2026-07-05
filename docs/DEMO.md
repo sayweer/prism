@@ -31,6 +31,29 @@ else matches. It's live on testnet, paying real USDC.
    sub-budgets." → attributed deposit appears.
 6. **Close:** "Bounded. Accounted. Funded. All Stellar-native. All live."
 
+## Level 5 full demo — per-user product (screen-recording script)
+
+Goal: prove Prism is a **usable product**, not just a demo — a first-time user connects a
+wallet and deploys their **own** bounded treasury, then the contract rejects a real over-spend.
+**Real screen recording** (Freighter + live testnet, real tx hashes) with voiceover *or*
+captions — no static-screenshot zoom/pan. Target ~2:15.
+
+| Time | Screen | Say / caption |
+|---|---|---|
+| 0:00–0:12 | Landing hero | "The wallet your AI agent can't drain. And it's not just a demo — let me deploy my own, live, in two minutes." |
+| 0:12–0:28 | Open app → **Connect wallet** → Freighter approve | "I connect my own Stellar wallet. This address becomes the treasury admin — nobody custodies my funds." |
+| 0:28–0:50 | Workspace → **Deploy treasury**, set per-task 10 / daily 50 → sign | "One click deploys my own bounded treasury on-chain. I set the rules: 10 USDC per task, 50 per day." *(show the tx link)* |
+| 0:50–1:05 | **Fund** the budget (friendbot if needed → fund) | "I fund it with real testnet XLM — attributed on-chain through a muxed sub-address, no memo." |
+| 1:05–1:20 | **Whitelist** the sample vendor | "I approve exactly one payee. Only this address can ever receive funds." |
+| 1:20–1:40 | **Pay** the whitelisted vendor → settles | "The agent pays — inside the limit, to an approved payee. Settled on-chain." *(tx link, balance drops)* |
+| 1:40–2:00 | **Pay** over the limit / a non-whitelisted address → 🔴 rejected | "Now I try to overspend. The contract rejects it on-chain — `ExceedsTaskLimit`. The funds never moved. The model can misbehave; the contract doesn't care." |
+| 2:00–2:12 | **Analytics** panel (payments / spent / violations) | "Every payment tagged to its task, every violation counted — read straight off-chain." |
+| 2:12–2:25 | Landing footer / QR | "Bounded. Confidential. Live on Stellar. Deploy your own at prism-stellar.vercel.app." |
+
+**Recording notes:** pre-fund a second wallet so friendbot waits are cut; keep Freighter on
+testnet; let each tx confirm on camera (the real hash is the proof); 1080p, cursor visible.
+Optional confidential-mode beat (ZK proof → attested) can slot before Analytics if time allows.
+
 ## Why Stellar (have this ready)
 
 Sub-cent deterministic fees make agent micro-payments viable; **muxed accounts** are the
