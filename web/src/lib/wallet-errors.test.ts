@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { connectErr, errText, sendErr } from "./wallet-errors";
+import { connectErr, CONTRACT_ERRORS, contractErr, errText, sendErr } from "./wallet-errors";
 
 describe("errText", () => {
   it("returns an Error's message", () => {
@@ -43,5 +43,32 @@ describe("sendErr", () => {
     expect(sendErr(new Error("transaction simulation failed: insufficient balance"))).toMatch(
       /Insufficient balance/,
     );
+  });
+});
+
+describe("contractErr", () => {
+  it("maps every contract error code (1..8) to its friendly message", () => {
+    for (const code of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      expect(contractErr(`host error: Error(Contract, #${code})`)).toEqual({
+        errorCode: code,
+        errorMessage: CONTRACT_ERRORS[code],
+      });
+    }
+  });
+  it("surfaces the escrow-locked free-balance rejection (#6) in plain language", () => {
+    expect(contractErr("Error(Contract, #6)")?.errorMessage).toMatch(/locked in open escrows/);
+  });
+  it("falls back to a generic message for an unknown code", () => {
+    expect(contractErr("Error(Contract, #42)")).toEqual({
+      errorCode: 42,
+      errorMessage: "Contract error #42",
+    });
+  });
+  it("returns null for non-contract failures so retry logic stays intact", () => {
+    expect(contractErr("tx bad_seq")).toBeNull();
+    expect(contractErr("")).toBeNull();
+  });
+  it("parses the variant without a # prefix", () => {
+    expect(contractErr("Error(Contract, 5)")?.errorCode).toBe(5);
   });
 });

@@ -214,13 +214,13 @@ export default function Workspace() {
         setPayAmt("");
         setRefreshKey((k) => k + 1);
       } else {
-        trackViolation();
+        trackViolation(treasuryId);
         void logActivity({ walletAddress: address, treasuryId, action: "reject", amountXlm: Number(payAmt) });
         setStatus({ kind: "error", msg: `Blocked by policy: ${res.errorMessage}` });
       }
       await loadState(treasuryId, address);
     } catch (e) {
-      trackError(errText(e)); // raw message for monitoring; the classified one for the user
+      trackError(treasuryId, errText(e)); // raw message for monitoring; the classified one for the user
       setStatus({ kind: "error", msg: sendErr(e) });
     } finally {
       setBusy(false);

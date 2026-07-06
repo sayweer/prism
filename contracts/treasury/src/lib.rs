@@ -142,6 +142,8 @@ impl Treasury {
 
     /// The agent asks the treasury to pay `amount` to `to` for `task_id`.
     /// The contract enforces the policy and rejects any violation on-chain.
+    /// Only the free (unlocked) balance is spendable — funds reserved by open
+    /// escrows cannot be paid out directly.
     pub fn pay(env: Env, task_id: u64, to: Address, amount: i128) -> Result<(), Error> {
         let cfg = Self::cfg(&env);
         cfg.agent.require_auth();
@@ -161,6 +163,10 @@ impl Treasury {
         let spent_today = Self::day_spent_on(&env, day);
         if spent_today + amount > cfg.daily_limit {
             return Err(Error::ExceedsDailyLimit);
+        }
+        let locked = Self::locked(env.clone());
+        if Self::balance(env.clone()) - locked < amount {
+            return Err(Error::InsufficientFreeBalance);
         }
         // ---------------------------------------------------------------------
 

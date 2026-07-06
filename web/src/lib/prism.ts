@@ -3,7 +3,8 @@
 
 import { Keypair } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
-import { Client, Errors } from "./treasuryClient";
+import { Client } from "./treasuryClient";
+import { contractErr } from "./wallet-errors";
 import {
   AGENT_PK,
   AGENT_SECRET,
@@ -72,15 +73,6 @@ function errText(e: unknown): string {
   return e instanceof Error ? e.message : typeof e === "string" ? e : JSON.stringify(e);
 }
 
-/** A deterministic contract guardrail rejection (#1..#4). Never retried. */
-function contractError(msg: string): { errorCode: number; errorMessage: string } | null {
-  const m = msg.match(/Error\(Contract,\s*#?(\d+)\)/);
-  if (!m) return null;
-  const code = Number(m[1]);
-  const known = (Errors as Record<number, { message: string }>)[code];
-  return { errorCode: code, errorMessage: known?.message ?? `Contract error #${code}` };
-}
-
 /** Transient infra / concurrency errors — several judges submitting at the same
  *  instant share one agent account, so a tx can land on a stale sequence. These
  *  are safe to retry after re-fetching the sequence. */
@@ -109,8 +101,8 @@ export async function agentPay(
     } catch (e) {
       const msg = errText(e);
       lastMsg = msg;
-      const ce = contractError(msg);
-      if (ce) return { ok: false, ...ce }; // real guardrail rejection — surface it
+      const ce = contractErr(msg);
+      if (ce) return { ok: false, ...ce }; // real guardrail rejection (#1..#8) — surface it
       if (attempt < MAX_TRIES - 1 && isTransient(msg)) {
         // back off with jitter so concurrent clients de-synchronise, then retry
         await sleep(220 * (attempt + 1) + Math.floor(Math.random() * 400));

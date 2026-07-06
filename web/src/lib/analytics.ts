@@ -30,27 +30,44 @@ export function agentScorecard(events: FeedEvent[]): Scorecard {
 }
 
 // ---- client-side monitor (errors + policy violations are not on-chain events) ----
-let errorCount = 0;
-let violationCount = 0;
-let lastError: string | null = null;
+// Scoped per treasury so counters from one treasury never bleed into another's panel.
+
+export interface MonitorState {
+  errors: number;
+  violations: number;
+  lastError: string | null;
+}
+
+const monitors = new Map<string, MonitorState>();
+
+function stateFor(treasuryId: string): MonitorState {
+  let s = monitors.get(treasuryId);
+  if (!s) {
+    s = { errors: 0, violations: 0, lastError: null };
+    monitors.set(treasuryId, s);
+  }
+  return s;
+}
 
 /** Record a runtime/network error (e.g. a failed RPC or wallet error). */
-export function trackError(msg: string): void {
-  errorCount += 1;
-  lastError = msg;
+export function trackError(treasuryId: string, msg: string): void {
+  const s = stateFor(treasuryId);
+  s.errors += 1;
+  s.lastError = msg;
 }
 
 /** Record a policy violation (a payment the contract rejected on-chain). */
-export function trackViolation(): void {
-  violationCount += 1;
+export function trackViolation(treasuryId: string): void {
+  stateFor(treasuryId).violations += 1;
 }
 
-export function getMonitor(): { errors: number; violations: number; lastError: string | null } {
-  return { errors: errorCount, violations: violationCount, lastError };
+/** A snapshot (copy) of the treasury's monitor — untouched treasuries read as zeroes. */
+export function getMonitor(treasuryId: string): MonitorState {
+  return { ...(monitors.get(treasuryId) ?? { errors: 0, violations: 0, lastError: null }) };
 }
 
-export function resetMonitor(): void {
-  errorCount = 0;
-  violationCount = 0;
-  lastError = null;
+/** Reset one treasury's counters, or all of them when no id is given. */
+export function resetMonitor(treasuryId?: string): void {
+  if (treasuryId === undefined) monitors.clear();
+  else monitors.delete(treasuryId);
 }

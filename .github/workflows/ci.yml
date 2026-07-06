@@ -42,6 +42,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # The web app ships its own copy of the generated treasury client; regen via
+      # `npm run generate` in packages/treasury-client keeps them byte-identical.
+      - name: treasury-client — web copy in sync
+        run: cmp packages/treasury-client/src/index.ts web/src/lib/treasuryClient.ts
       - uses: actions/setup-node@v4
         with:
           node-version: 22

@@ -43,3 +43,25 @@ export function sendErr(e: unknown): string {
   }
   return opCodes || errText(e) || "Transaction failed.";
 }
+
+/** On-chain policy rejections (`Error(Contract, #N)`) → human-readable messages.
+ *  A rejection is the product working — these read as guardrails, not failures. */
+export const CONTRACT_ERRORS: Record<number, string> = {
+  1: "Amount must be greater than zero.",
+  2: "Payee isn't approved — not on the whitelist.",
+  3: "Over the per-task limit — blocked by policy.",
+  4: "Over today's daily limit — blocked by policy.",
+  5: "Payee's reputation score is below the required threshold.",
+  6: "Not enough free balance — funds are locked in open escrows.",
+  7: "Escrow not found — it may already be released or refunded.",
+  8: "Escrow deadline hasn't passed yet — refund isn't available.",
+};
+
+/** Parse a contract guardrail rejection out of a raw error message. Returns null
+ *  when the failure isn't a contract error, so callers' retry logic stays intact. */
+export function contractErr(msg: string): { errorCode: number; errorMessage: string } | null {
+  const m = msg.match(/Error\(Contract,\s*#?(\d+)\)/);
+  if (!m) return null;
+  const code = Number(m[1]);
+  return { errorCode: code, errorMessage: CONTRACT_ERRORS[code] ?? `Contract error #${code}` };
+}

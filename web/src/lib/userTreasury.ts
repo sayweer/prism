@@ -10,15 +10,18 @@ import {
   StrKey,
   TransactionBuilder,
 } from "@stellar/stellar-sdk";
-import { Client, Errors } from "./treasuryClient";
+import { Client } from "./treasuryClient";
+import { contractErr } from "./wallet-errors";
 import type { ContractSigner } from "./walletSigner";
 import { NETWORK_PASSPHRASE, RPC_URL } from "../config";
 
 // Native XLM SAC on testnet — the token each user treasury holds and spends.
 export const XLM_SAC = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC";
 // Treasury WASM already installed on-chain — deploy just instantiates a new contract from it.
+// v2.1 (escrow + reputation + pay() free-balance guard), installed 2026-07-06:
+// https://stellar.expert/explorer/testnet/tx/aa38b845132ffaa87f99148bc46412bb4f66c32e2f7470f707a4e809f1435765
 export const TREASURY_WASM_HASH =
-  "41c8bb1f0b4d9bd7b89c3a855ee87cb56971a256fe110cd2860d406dde040c2b";
+  "3f01e85ddf344e9f9298f828a43fe6acbb2666e5f36f6899d197a47021290280";
 
 const XLM_UNIT = 10_000_000;
 
@@ -151,7 +154,7 @@ export async function removePayee(treasury: Client, payee: string): Promise<void
 }
 
 /** Spend from the treasury. The contract enforces the policy and rejects violations
- *  on-chain (#1..#4) — those rejections are the product working, surfaced as messages. */
+ *  on-chain (#1..#8) — those rejections are the product working, surfaced as messages. */
 export async function pay(
   treasury: Client,
   taskId: bigint,
@@ -166,12 +169,8 @@ export async function pay(
     return { ok: true, hash };
   } catch (e) {
     const msg = e instanceof Error ? e.message : typeof e === "string" ? e : JSON.stringify(e);
-    const m = msg.match(/Error\(Contract,\s*#?(\d+)\)/);
-    if (m) {
-      const code = Number(m[1]);
-      const known = (Errors as Record<number, { message: string }>)[code];
-      return { ok: false, errorCode: code, errorMessage: known?.message ?? `Contract error #${code}` };
-    }
+    const ce = contractErr(msg);
+    if (ce) return { ok: false, ...ce };
     return { ok: false, errorMessage: msg.slice(0, 160) || "Payment failed." };
   }
 }

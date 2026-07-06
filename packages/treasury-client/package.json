@@ -5,7 +5,10 @@
   "exports": "./dist/index.js",
   "typings": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "generate": "stellar contract bindings typescript --wasm ../../target/wasm32v1-none/release/treasury.wasm --output-dir \"${TMPDIR:-/tmp}/treasury-bindings\" --overwrite && cp \"${TMPDIR:-/tmp}/treasury-bindings/src/index.ts\" src/index.ts && npm run sync:web",
+    "sync:web": "cp src/index.ts ../../web/src/lib/treasuryClient.ts",
+    "check:sync": "cmp src/index.ts ../../web/src/lib/treasuryClient.ts"
   },
   "dependencies": {
     "@stellar/stellar-sdk": "^14.5.0",

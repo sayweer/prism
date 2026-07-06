@@ -36,8 +36,8 @@ by your own wallet — non-custodial, funds stay under your control the whole ti
 
 - Errors are shown in plain language inside the app (insufficient balance, signature
   rejected, and so on).
-- Two sentences via the **Share feedback** button (bottom right) directly shape the
-  roadmap. 🙏
+- The **Share feedback** button (bottom right) opens a short Google Form — two sentences
+  there directly shape the roadmap. 🙏
 
 ## More
 

@@ -32,8 +32,8 @@ Her adım cüzdanınızla imzalanır — non-custodial, fonlar hep sizin kontrol
 ## Bir şey ters giderse
 
 - Hata mesajları uygulama içinde açıklamalı gösterilir (bakiye yetersiz, imza reddedildi vb.).
-- Sağ alttaki **Share feedback** butonundan iki cümlelik geri bildirim bırakırsan
-  yol haritasını doğrudan şekillendirirsin. 🙏
+- Sağ alttaki **Share feedback** butonu kısa bir Google Form açar — iki cümlelik geri
+  bildirim yol haritasını doğrudan şekillendirir. 🙏
 
 ## Daha fazlası
 

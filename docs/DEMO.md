@@ -13,7 +13,8 @@ wallet, because one jailbreak drains it and hundreds of micro-payments are impos
 reconcile. Prism fixes both: the agent's spend is **bounded by a Soroban contract** (whitelist,
 per-task and daily limits, rejected on-chain), every payment is **auto-accounted per task**,
 and budgets are funded through **zero-cost muxed sub-addresses** — Stellar primitives nothing
-else matches. It's live on testnet, paying real USDC.
+else matches. It's live on testnet, settling payments in testnet USDC (a test-issued asset;
+per-user treasuries run on native testnet XLM — Circle USDC is the mainnet path).
 
 ## 90-second live demo
 

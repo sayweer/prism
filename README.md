@@ -11,7 +11,7 @@ A non-custodial Soroban treasury that lets a business hand an autonomous AI agen
 [![CI](https://github.com/Bekirerdem/prism/actions/workflows/ci.yml/badge.svg)](https://github.com/Bekirerdem/prism/actions/workflows/ci.yml)
 ![Stellar testnet](https://img.shields.io/badge/Stellar-testnet-FDDA24?style=flat-square)
 ![Rust · Soroban](https://img.shields.io/badge/Rust_·_Soroban-FDDA24?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-treasury_14%2F14_·_circuit_5%2F5_·_verifier_4%2F4-FDDA24?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-treasury_24%2F24_·_circuit_5%2F5_·_verifier_4%2F4-FDDA24?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-3a3a3a?style=flat-square)
 
 **[▶ Live demo](https://prism-stellar.vercel.app) · [🎥 Demo video](https://youtu.be/R7mw9ZTh94U) · [🎤 Pitch deck](https://deck-bice-omega.vercel.app) · [🗺 Roadmap](ROADMAP.md) · [🔗 Contract on Stellar Expert](https://stellar.expert/explorer/testnet/contract/CAYWNXHANRY5GSJAZOR4YTKBKNOKTCITE52ZRKDKCAWLDTYWFFVFSPAZ) · [📄 Deployment & proofs](DEPLOYMENT.md)**
@@ -46,7 +46,7 @@ Also built in this window (the open-economy trust layer): reputation-gated payee
 - **Fund** — earmark a budget per agent via zero-cost Stellar **muxed sub-addresses** — no memos, no new accounts.
 - **Trust + outcome** — pay any agent above an earned **reputation** threshold (not just a static whitelist), **escrow** funds for pay-on-delivery, and cap an agent's **x402** pay-per-use API spend.
 - **Prove (ZK)** — confidential mode proves the agent stayed within policy in zero-knowledge, [verified on-chain](https://stellar.expert/explorer/testnet/tx/4438c94952d6d06fbf6b205e07be1c28ea33c5e1422a5323e93572788b9cac2a), revealing no amount or payee.
-- **Live** — deployed on Stellar testnet, settling real on-chain payments and rejecting real exploits. The demo pays testnet USDC (a test-issued asset); the per-user product runs on native testnet XLM. Circle USDC is the mainnet path ([roadmap M3](ROADMAP.md)). `cargo test -p treasury` → **14/14**.
+- **Live** — deployed on Stellar testnet, settling real on-chain payments and rejecting real exploits. The demo pays testnet USDC (a test-issued asset); the per-user product runs on native testnet XLM. Circle USDC is the mainnet path ([roadmap M3](ROADMAP.md)). `cargo test -p treasury` → **24/24**.
 
 ## The problem
 
@@ -79,7 +79,8 @@ The agent signs its own `pay(task, to, amount)`. The contract runs the policy ga
 3. payee whitelisted OR reputation≥min  else  PayeeNotWhitelisted / BelowReputation (#2/#5)
 4. amount ≤ per-task limit           else  ExceedsTaskLimit     (#3)
 5. day_spent + amount ≤ daily limit  else  ExceedsDailyLimit    (#4)
-6. record spend, THEN transfer       (checks-effects-interactions — reverts atomically)
+6. amount ≤ balance − escrow-locked  else  InsufficientFreeBalance (#6)
+7. record spend, THEN transfer       (checks-effects-interactions — reverts atomically)
 ```
 
 A prompt-injected "drain to attacker" payment is signed by the agent and still **bounces** at step 3 — funds never move.
@@ -131,7 +132,7 @@ Three upgrades take Prism from a walled garden to the open agent economy — eac
 - **Escrow (pay-on-delivery).** `create_escrow` locks funds for a payee against a task — reserved in the treasury, not moved. The owner `release`s them on approval (daily limit + accounting applied at the real outflow), or the agent `refund`s after a deadline (the lock returns to the free balance, nothing paid). [Live: release](https://stellar.expert/explorer/testnet/tx/df742d987d85efb517a164b68e36c9302c4daf623c15dcaf416c73cbb26f6c4b) · [refund](https://stellar.expert/explorer/testnet/tx/b545aeb489e8e36f73b195f299b5926f2387979cd71701bb428a8b099a718e46).
 - **Bounded x402.** When an agent hits an [x402](https://developers.stellar.org/docs/build/agentic-payments/x402) `402 Payment Required`, `packages/x402` gates the payment against the treasury policy first and only settles through the bounded treasury's `pay()` if it passes — the agent can't be tricked into an over-limit or wrong-payee x402 payment. [Live: an in-policy x402 payment settled on-chain](https://stellar.expert/explorer/testnet/tx/8a1a887ac32b700d7e2ad2d28d64760003529c8d804be600891b162eba8ada1a); an over-limit one is gated off-chain before it ever reaches `pay()`. `npm test` → **11/11**.
 
-`cargo test -p treasury` → **14/14** (6 core + 3 reputation + 5 escrow).
+`cargo test -p treasury` → **24/24** (6 core + 3 reputation + 5 escrow + 10 hardening: auth-negatives, escrow lifecycle edges, and the free-balance invariant — `pay()` can't spend escrow-locked funds).
 
 ## Why Stellar
 
@@ -163,7 +164,7 @@ Beyond the spectator demo, **connect a wallet and run your own** bounded treasur
 7. **Spend** — in-policy payments settle on-chain; anything over a limit or to a non-whitelisted payee is **rejected by the contract** (`ExceedsTaskLimit` / `PayeeNotWhitelisted`), funds never move. The rejection is the product working.
 8. **Analytics & monitoring** — payment count, total spent, policy violations, and runtime errors, read from your treasury's on-chain events.
 
-Every action is signed by your own wallet — non-custodial end to end. In-app feedback steers the roadmap.
+Every action is signed by your own wallet — non-custodial end to end. Feedback via the **Share feedback** button (a short Google Form) steers the roadmap.
 
 ## Live on testnet
 
@@ -203,7 +204,7 @@ Prism is dogfooded by real testers. Structured feedback is collected through a *
 
 ```bash
 # 1. Contract — test & build (already deployed; this is optional)
-cargo test  --manifest-path contracts/treasury/Cargo.toml   # 14/14 passing
+cargo test  --manifest-path contracts/treasury/Cargo.toml   # 24/24 passing
 stellar contract build --manifest-path contracts/treasury/Cargo.toml
 
 # 2. Frontend — landing + live dashboard
@@ -239,8 +240,8 @@ The dashboard reads live testnet state, and the embedded agent key (testnet-only
 ## Project structure
 
 ```
-contracts/treasury/             Soroban bounded treasury — bound/account/fund + reputation gate + escrow (+ 14 tests)
-contracts/compliance_verifier/  on-chain BN254 Groth16 verifier (ZK) + attestation (+ 2 tests)
+contracts/treasury/             Soroban bounded treasury — bound/account/fund + reputation gate + escrow (+ 24 tests)
+contracts/compliance_verifier/  on-chain BN254 Groth16 verifier (ZK) + attestation (+ 4 tests)
 contracts/reputation_oracle/    ERC-8004-style reputation registry (stellar-8004 stand-in)
 circuits/                       Circom compliance circuit + circomkit tests + trusted setup
 packages/treasury-client/       generated TypeScript client
