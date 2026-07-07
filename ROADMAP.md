@@ -11,14 +11,14 @@ PRISM is moving from a proven testnet product to **mainnet agent-payments infras
 - [ ] 10+ real user wallets with on-chain interactions (risein Journey-to-Mastery Level 4) — distribution in progress
 - [ ] Published user-feedback summary
 
-## M2 — Agent infrastructure
+## M2 — Agent infrastructure *(shipped 2026-07-07)*
 
 Closing the gap between "a human signs every payment" and "an agent spends autonomously, safely":
 
-- [ ] **Session-key agent signing** — time-bound, spend-capped agent credentials per user treasury (`agent ≠ admin`), instant revocation
-- [ ] **Contract lifecycle** — pause/freeze switch, agent-key rotation, admin withdraw, limit updates (today the contract is immutable by design; real users need an exit)
-- [ ] **On-chain treasury registry** — discovery & recovery by owner wallet (no client-side-only state)
-- [ ] **Rolling daily-limit window** — close the fixed-UTC-day 2× boundary spend
+- [x] **Session-key agent signing** — time-bound, spend-capped agent credentials per user treasury (`agent ≠ admin`), instant revocation; the browser session key signs payments with zero wallet popups
+- [x] **Contract lifecycle** — pause/freeze switch, agent-key rotation, admin withdraw, limit updates (the contract stays deliberately non-upgradeable; the exit is pause + withdraw)
+- [x] **On-chain treasury registry** — discovery & recovery by owner wallet (no client-side-only state)
+- [x] **Rolling daily-limit window** — closed the fixed-UTC-day 2× boundary spend (hourly buckets)
 
 ## M3 — Mainnet
 
@@ -42,4 +42,4 @@ Closing the gap between "a human signs every payment" and "an agent spends auton
 
 ---
 
-**Where we are:** M1 nearly complete — the product is live at [prism-stellar.vercel.app](https://prism-stellar.vercel.app) with real testnet users. M2 is specced (session keys, lifecycle) and is the immediate next build. Progress is tracked in the commit history and [`DEPLOYMENT.md`](DEPLOYMENT.md).
+**Where we are:** M2 is shipped — treasury v3 (agent sessions + lifecycle + rolling window, [design spec](docs/superpowers/specs/2026-07-07-prism-m2-design.md)) and the treasury registry are live on testnet, wired into the app. M1's remaining boxes (10+ user wallets, published feedback summary) are distribution work in progress. M3 (mainnet path) is next. Progress is tracked in the commit history and [`DEPLOYMENT.md`](DEPLOYMENT.md).

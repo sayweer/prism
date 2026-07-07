@@ -4,6 +4,42 @@ Notable changes to PRISM, grouped by release wave. Full detail lives in the
 [conventional-commit history](https://github.com/Bekirerdem/prism/commits/main);
 deployed addresses and on-chain proofs in [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
+## [0.4.0] — 2026-07-07 · M2 agent infrastructure (treasury v3 + registry)
+
+The gap between "a human signs every payment" and "an agent spends autonomously,
+safely" — closed ([design spec](docs/superpowers/specs/2026-07-07-prism-m2-design.md)).
+
+- **Added (contract v3)** — agent **sessions**: time-bound, spend-capped, instantly
+  revocable credentials that are the *only* spender while active (single-spender rule) ·
+  lifecycle: `set_paused` (exit paths never lock), `admin_withdraw` (free balance,
+  window-exempt), `set_limits` (validated, immediate), `set_agent` rotation ·
+  **rolling 24h window** replaces the fixed UTC day (hourly buckets; audit finding C2
+  closed with an on-chain-provable boundary test) · constructor limit validation (C5) ·
+  new errors `#9 Paused`, `#10 ExceedsSessionLimit`, `#11 InvalidLimits` · 45 tests
+- **Added (registry)** — permissionless `treasury_registry` contract (owner → treasuries)
+  + best-effort registration on deploy + cross-device recovery in the Workspace
+- **Added (app)** — Controls (pause/resume, withdraw, limit updates) · Agent session
+  section with zero-popup **Run autonomous task** (browser session key signs; wallet
+  popups only to start/revoke) · legacy-treasury detection (pre-M2 treasuries keep
+  working, new sections hide) · friendly messages for #9–#11
+- **Changed** — `day_spent()` now reports the rolling 24h window (UI label "Last 24h");
+  the `DaySpent` calendar-day key is gone from v3; per-user deploys instantiate the v3
+  wasm — earlier treasuries stay on their original immutable code
+- **Decided** — the contract remains **non-upgradeable by design**: the exit is
+  pause + withdraw + redeploy, not "trust the admin"
+
+## [0.3.2] — 2026-07-06 · Hardening wave
+
+- **Fixed (contract)** — `pay()` can no longer spend escrow-locked funds (free-balance
+  invariant, `#6`); +10 hardening tests (auth-negatives, escrow lifecycle edges)
+- **Fixed (web)** — head-based event paging (newest events never dropped; ~1 RPC per
+  refresh) · multi-treasury localStorage schema (second deploy no longer overwrites the
+  first id) · per-treasury monitor counters · friendly contract-error messages (#1..#8)
+  from a single map · generated client regenerated from the v2.1 wasm (escrow +
+  reputation callable; single-source `npm run generate` + CI byte-sync guard)
+- **Docs** — stale claims synced (feedback → Google Form, test counts, DEMO wording);
+  orphan in-app feedback modal removed
+
 ## [0.3.1] — 2026-07-02 · Onboarding & UX hardening
 
 First-real-users wave: everything a cold wallet hits in its first five minutes.

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { isValidContractId, toStroops, XLM_SAC } from "./userTreasury";
+import { isValidContractId, readLifecycle, toStroops, XLM_SAC } from "./userTreasury";
+import type { Client } from "./treasuryClient";
 
 describe("isValidContractId", () => {
   it("accepts a real contract id", () => {
@@ -34,5 +35,27 @@ describe("toStroops", () => {
     expect(() => toStroops(-1)).toThrow();
     expect(() => toStroops(NaN)).toThrow();
     expect(() => toStroops(Infinity)).toThrow();
+  });
+});
+
+describe("readLifecycle", () => {
+  it("returns the pause flag and session from a v3 treasury", async () => {
+    const fake = {
+      is_paused: async () => ({ result: true }),
+      get_session: async () => ({ result: undefined }),
+    } as unknown as Client;
+    expect(await readLifecycle(fake)).toEqual({ paused: true, session: null });
+  });
+
+  it("returns null on a pre-M2 treasury (probe failure = legacy signal)", async () => {
+    const legacyTreasury = {
+      is_paused: async () => {
+        throw new Error("HostError: Error(WasmVm, MissingValue)"); // fn not in the old wasm
+      },
+      get_session: async () => {
+        throw new Error("HostError: Error(WasmVm, MissingValue)");
+      },
+    } as unknown as Client;
+    expect(await readLifecycle(legacyTreasury)).toBeNull();
   });
 });

@@ -47,13 +47,17 @@ describe("sendErr", () => {
 });
 
 describe("contractErr", () => {
-  it("maps every contract error code (1..8) to its friendly message", () => {
-    for (const code of [1, 2, 3, 4, 5, 6, 7, 8]) {
+  it("maps every contract error code (1..11) to its friendly message", () => {
+    for (const code of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]) {
       expect(contractErr(`host error: Error(Contract, #${code})`)).toEqual({
         errorCode: code,
         errorMessage: CONTRACT_ERRORS[code],
       });
     }
+  });
+  it("reads the pause and session-cap rejections as guardrails, not failures", () => {
+    expect(contractErr("Error(Contract, #9)")?.errorMessage).toMatch(/paused/i);
+    expect(contractErr("Error(Contract, #10)")?.errorMessage).toMatch(/session/i);
   });
   it("surfaces the escrow-locked free-balance rejection (#6) in plain language", () => {
     expect(contractErr("Error(Contract, #6)")?.errorMessage).toMatch(/locked in open escrows/);

@@ -38,6 +38,10 @@ export const ATTACKER = "GAKSMBN6TRMF4M4PL3FJSDMQRD6XBQCJFLECLYTNAXZYMRIWXT6ADYT
 // attribute incoming deposits to individual agent budgets (no memos, no new accounts).
 export const POOL_PK = "GD2NZKSMQW367OIFXRM4NP7RIW6YLDZLJ4C7253MDOKCFC4Q4IOO3427";
 
+// Prism Treasury Registry — permissionless wallet → treasury discovery index,
+// used for cross-device recovery of per-user treasuries (M2).
+export const REGISTRY_ID = "CBEPVXK6BN2FZ3IYHV5KQUGROFHNBWBYHKHRZ5U3O7UWGIOPFOFE4ZE7";
+
 // 8004 (trionlabs/stellar-8004) testnet registries — the agent trust layer.
 export const REG_IDENTITY = "CDE3K4COIAGWNNJQQLL26SYI3KBJF5FUDHXG5FA6GYDJCG7T5V7FIWZH";
 export const REG_REPUTATION = "CBZEAGIEI3HXMDRLF44KLQJQQOH6LCYWWSGJVSYQYQO2HQ6DDGZ7HT55";

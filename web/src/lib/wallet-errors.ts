@@ -55,6 +55,9 @@ export const CONTRACT_ERRORS: Record<number, string> = {
   6: "Not enough free balance — funds are locked in open escrows.",
   7: "Escrow not found — it may already be released or refunded.",
   8: "Escrow deadline hasn't passed yet — refund isn't available.",
+  9: "Treasury is paused — spending is temporarily frozen by the owner.",
+  10: "Over the agent session's spending cap — blocked by policy.",
+  11: "Invalid limits — both must be positive and per-payment can't exceed daily.",
 };
 
 /** Parse a contract guardrail rejection out of a raw error message. Returns null

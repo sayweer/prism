@@ -115,10 +115,43 @@ Contract tests: `cargo test -p treasury` → **14/14** (6 core + 3 reputation + 
 The reputation source is an ERC-8004-style registry (`reputation_of(agent) → i128`); the
 oracle above is a demo stand-in for trionlabs/stellar-8004, which is the production target.
 
+## Treasury v3 + Treasury Registry — M2 agent infrastructure (live on testnet)
+
+M2 ([design spec](docs/superpowers/specs/2026-07-07-prism-m2-design.md)) ships agent
+**sessions** (time-bound, spend-capped, instantly revocable — the ONLY spender while
+active), the contract **lifecycle** (pause/resume, admin withdraw, limit updates, agent
+rotation), and a **rolling 24h window** (hourly buckets — closes audit finding C2).
+Deployed with the `seyit` identity; per-user deploys in the app instantiate v3.
+
+| Item | Value |
+|------|-------|
+| **Treasury v3 wasm hash** | `2e6ab69e964b85a1954443d067d809c8519a20eb909fd16ac23abab318f184b8` |
+| v3 upload tx | [`aa81495d…90bef`](https://stellar.expert/explorer/testnet/tx/aa81495db875d28715acb056614614bd04094b4aaf67f80b05ffefd0ec590bef) |
+| v2.1 wasm hash (previous: escrow + free-balance guard) | `3f01e85ddf344e9f9298f828a43fe6acbb2666e5f36f6899d197a47021290280` |
+| **Treasury Registry** | [`CBEPVXK6…4ZE7`](https://stellar.expert/explorer/testnet/contract/CBEPVXK6BN2FZ3IYHV5KQUGROFHNBWBYHKHRZ5U3O7UWGIOPFOFE4ZE7) |
+| M2 smoke treasury (v3) | [`CCXC3DSK…XR7K`](https://stellar.expert/explorer/testnet/contract/CCXC3DSKCURJ76P3GNVCATBO572ZCZG6PHRPC22FTTGI7O3GFAHIXR7K) |
+
+Verified live on the smoke treasury:
+
+- **Rolling window** — a `pay` executes with the 24-bucket read footprint well inside tx
+  limits; `day_spent` reports the rolling sum.
+- **Pause** — `pay` while paused → `Error(Contract, #9)`; `admin_withdraw` still works
+  while paused (exit paths never lock).
+- **Limits** — `set_limits(100, 200)` → `Error(Contract, #11)`; after `set_limits`
+  lowered per-task, an over-limit `pay` → `Error(Contract, #3)` immediately.
+- **Session single-spender** — after `set_session`, the session key paid on-chain; the
+  ROOT agent's signature could no longer authorise `pay` (auth requires the session
+  agent); over-cap → `Error(Contract, #10)`; after `revoke_session` the root agent paid
+  again and `get_session` → `None`.
+- **Registry** — `register` + duplicate no-op + `treasuries_of` returning the treasury.
+
+Contract tests: `cargo test -p treasury` → **45/45** · `cargo test -p treasury_registry` → **3/3**.
+
 ## Error codes
 
 `1` InvalidAmount · `2` PayeeNotWhitelisted · `3` ExceedsTaskLimit · `4` ExceedsDailyLimit ·
-`5` BelowReputationThreshold · `6` InsufficientFreeBalance · `7` EscrowNotFound · `8` DeadlineNotReached
+`5` BelowReputationThreshold · `6` InsufficientFreeBalance · `7` EscrowNotFound · `8` DeadlineNotReached ·
+`9` Paused · `10` ExceedsSessionLimit · `11` InvalidLimits
 
 ## Funding rail — muxed attribution
 
