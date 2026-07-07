@@ -8,23 +8,50 @@ import { AlbedoModule } from "@creit.tech/stellar-wallets-kit/modules/albedo";
 import { LobstrModule } from "@creit.tech/stellar-wallets-kit/modules/lobstr";
 import { RabetModule } from "@creit.tech/stellar-wallets-kit/modules/rabet";
 import { HanaModule } from "@creit.tech/stellar-wallets-kit/modules/hana";
+import {
+  WalletConnectModule,
+  WalletConnectTargetChain,
+} from "@creit.tech/stellar-wallets-kit/modules/wallet-connect";
 import { NETWORK_PASSPHRASE } from "../config";
 import { makeWalletSigner, type ContractSigner } from "./walletSigner";
 import { logFunnel } from "./funnel";
 import { errText } from "./wallet-errors";
 
+// The extension modules only work on desktop. Freighter (and Lobstr) on a phone connect
+// over WalletConnect v2 — so without this module a mobile visitor with the wallet installed
+// still sees "not installed". Added first (top of the modal) and only when a project id is
+// configured, so the app never crashes without it.
+const WC_PROJECT_ID = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID as string | undefined;
+
+const modules = [
+  new FreighterModule(),
+  new xBullModule(),
+  new AlbedoModule(),
+  new LobstrModule(),
+  new RabetModule(),
+  new HanaModule(),
+];
+
+if (WC_PROJECT_ID) {
+  modules.unshift(
+    new WalletConnectModule({
+      projectId: WC_PROJECT_ID,
+      metadata: {
+        name: "Prism",
+        description: "The wallet your AI agent can't drain",
+        url: "https://prism-stellar.vercel.app",
+        icons: ["https://prism-stellar.vercel.app/apple-touch-icon.png"],
+      },
+      allowedChains: [WalletConnectTargetChain.TESTNET],
+    }),
+  );
+}
+
 // One-time kit setup. `authModal()` lists these as the available "wallet options".
 StellarWalletsKit.init({
   network: Networks.TESTNET,
   selectedWalletId: FREIGHTER_ID,
-  modules: [
-    new FreighterModule(),
-    new xBullModule(),
-    new AlbedoModule(),
-    new LobstrModule(),
-    new RabetModule(),
-    new HanaModule(),
-  ],
+  modules,
 });
 
 // Theme the wallet-select modal to match Prism — dark surface + Stellar-yellow accent.
