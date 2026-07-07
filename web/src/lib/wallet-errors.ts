@@ -58,6 +58,7 @@ export const CONTRACT_ERRORS: Record<number, string> = {
   9: "Treasury is paused — spending is temporarily frozen by the owner.",
   10: "Over the agent session's spending cap — blocked by policy.",
   11: "Invalid limits — both must be positive and per-payment can't exceed daily.",
+  12: "Escrow deadline must be in the future.",
 };
 
 /** Parse a contract guardrail rejection out of a raw error message. Returns null

@@ -44,7 +44,8 @@ export const Errors = {
   8: {message:"DeadlineNotReached"},
   9: {message:"Paused"},
   10: {message:"ExceedsSessionLimit"},
-  11: {message:"InvalidLimits"}
+  11: {message:"InvalidLimits"},
+  12: {message:"InvalidDeadline"}
 }
 
 
@@ -247,6 +248,16 @@ export interface Client {
   revoke_session: (options?: MethodOptions) => Promise<AssembledTransaction<null>>
 
   /**
+   * Construct and simulate a admin_cancel_escrow transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   * Admin unilaterally cancels an open escrow — the lock returns to the free
+   * balance, nothing is paid, no deadline needed. This is the incident-response
+   * path: a compromised agent could otherwise tie up the whole treasury in
+   * escrows it alone can refund. Deliberately works while paused (exit path);
+   * the session budget is NOT restored (consistent with refund).
+   */
+  admin_cancel_escrow: ({id}: {id: u64}, options?: MethodOptions) => Promise<AssembledTransaction<Result<void>>>
+
+  /**
    * Construct and simulate a get_reputation_policy transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    * The active reputation gate, if any: `(registry, min_reputation)`.
    */
@@ -281,7 +292,7 @@ export class Client extends ContractClient {
   }
   constructor(public readonly options: ContractClientOptions) {
     super(
-      new ContractSpec([ "AAAABAAAAAAAAAAAAAAABUVycm9yAAAAAAAACwAAAAAAAAANSW52YWxpZEFtb3VudAAAAAAAAAEAAAAAAAAAE1BheWVlTm90V2hpdGVsaXN0ZWQAAAAAAgAAAAAAAAAQRXhjZWVkc1Rhc2tMaW1pdAAAAAMAAAAAAAAAEUV4Y2VlZHNEYWlseUxpbWl0AAAAAAAABAAAAAAAAAAYQmVsb3dSZXB1dGF0aW9uVGhyZXNob2xkAAAABQAAAAAAAAAXSW5zdWZmaWNpZW50RnJlZUJhbGFuY2UAAAAABgAAAAAAAAAORXNjcm93Tm90Rm91bmQAAAAAAAcAAAAAAAAAEkRlYWRsaW5lTm90UmVhY2hlZAAAAAAACAAAAAAAAAAGUGF1c2VkAAAAAAAJAAAAAAAAABNFeGNlZWRzU2Vzc2lvbkxpbWl0AAAAAAoAAAAAAAAADUludmFsaWRMaW1pdHMAAAAAAAAL",
+      new ContractSpec([ "AAAABAAAAAAAAAAAAAAABUVycm9yAAAAAAAADAAAAAAAAAANSW52YWxpZEFtb3VudAAAAAAAAAEAAAAAAAAAE1BheWVlTm90V2hpdGVsaXN0ZWQAAAAAAgAAAAAAAAAQRXhjZWVkc1Rhc2tMaW1pdAAAAAMAAAAAAAAAEUV4Y2VlZHNEYWlseUxpbWl0AAAAAAAABAAAAAAAAAAYQmVsb3dSZXB1dGF0aW9uVGhyZXNob2xkAAAABQAAAAAAAAAXSW5zdWZmaWNpZW50RnJlZUJhbGFuY2UAAAAABgAAAAAAAAAORXNjcm93Tm90Rm91bmQAAAAAAAcAAAAAAAAAEkRlYWRsaW5lTm90UmVhY2hlZAAAAAAACAAAAAAAAAAGUGF1c2VkAAAAAAAJAAAAAAAAABNFeGNlZWRzU2Vzc2lvbkxpbWl0AAAAAAoAAAAAAAAADUludmFsaWRMaW1pdHMAAAAAAAALAAAAAAAAAA9JbnZhbGlkRGVhZGxpbmUAAAAADA==",
         "AAAAAAAAAPVUaGUgYWdlbnQgYXNrcyB0aGUgdHJlYXN1cnkgdG8gcGF5IGBhbW91bnRgIHRvIGB0b2AgZm9yIGB0YXNrX2lkYC4KVGhlIGNvbnRyYWN0IGVuZm9yY2VzIHRoZSBwb2xpY3kgYW5kIHJlamVjdHMgYW55IHZpb2xhdGlvbiBvbi1jaGFpbi4KT25seSB0aGUgZnJlZSAodW5sb2NrZWQpIGJhbGFuY2UgaXMgc3BlbmRhYmxlIOKAlCBmdW5kcyByZXNlcnZlZCBieSBvcGVuCmVzY3Jvd3MgY2Fubm90IGJlIHBhaWQgb3V0IGRpcmVjdGx5LgAAAAAAAANwYXkAAAAAAwAAAAAAAAAHdGFza19pZAAAAAAGAAAAAAAAAAJ0bwAAAAAAEwAAAAAAAAAGYW1vdW50AAAAAAALAAAAAQAAA+kAAAACAAAAAw==",
         "AAAAAQAAAAAAAAAAAAAABkNvbmZpZwAAAAAABQAAADtPd25lciBvZiB0aGUgZnVuZHM7IHRoZSBvbmx5IG9uZSB3aG8gY2FuIGNoYW5nZSB0aGUgcG9saWN5LgAAAAAFYWRtaW4AAAAAAAATAAAARVRoZSByb290IGFnZW50IGFsbG93ZWQgdG8gdHJpZ2dlciBwYXltZW50cyB3aGVuIG5vIHNlc3Npb24gaXMgYWN0aXZlLgAAAAAAAAVhZ2VudAAAAAAAABMAAAA6TWF4IHRvdGFsIHNwZW5kIGFsbG93ZWQgaW5zaWRlIGFueSByb2xsaW5nIDI0LWhvdXIgd2luZG93LgAAAAAAC2RhaWx5X2xpbWl0AAAAAAsAAAAmTWF4IHNwZW5kIGFsbG93ZWQgaW4gYSBzaW5nbGUgcGF5bWVudC4AAAAAAA5wZXJfdGFza19saW1pdAAAAAAACwAAAD1TRVAtNDEgLyBTQUMgdG9rZW4gdGhlIHRyZWFzdXJ5IGhvbGRzIGFuZCBzcGVuZHMgKGUuZy4gVVNEQykuAAAAAAAABXRva2VuAAAAAAAAEw==",
         "AAAAAQAAAO5BbiBvdXRjb21lLWJvdW5kIHBheW1lbnQ6IGBhbW91bnRgIGlzIHJlc2VydmVkIChsb2NrZWQpIGluIHRoZSB0cmVhc3VyeSBmb3IKYHBheWVlYCBhZ2FpbnN0IGB0YXNrX2lkYCwgcmVsZWFzYWJsZSBvbiBhcHByb3ZhbCBvciByZWZ1bmRhYmxlIGFmdGVyIGBkZWFkbGluZWAKKFVOSVggc2Vjb25kcykuIFRoZSBmdW5kcyBuZXZlciBsZWF2ZSB1bnRpbCByZWxlYXNlIOKAlCByZWZ1bmQganVzdCB1bmxvY2tzIHRoZW0uAAAAAAAAAAAABkVzY3JvdwAAAAAABAAAAAAAAAAGYW1vdW50AAAAAAALAAAAAAAAAAhkZWFkbGluZQAAAAYAAAAAAAAABXBheWVlAAAAAAAAEwAAAAAAAAAHdGFza19pZAAAAAAG",
@@ -308,6 +319,7 @@ export class Client extends ContractClient {
         "AAAAAAAAAW5Pd25lciByZWNsYWltcyBmcmVlICh1bmxvY2tlZCkgZnVuZHMgd2l0aCB0aGVpciBvd24gc2lnbmF0dXJlLiBEZWxpYmVyYXRlbHkKZXhlbXB0IGZyb20gcGF1c2UsIHRoZSBwYXllZSBnYXRlLCBhbmQgdGhlIHJvbGxpbmcgd2luZG93OiB0aG9zZSBib3VuZAoqZGVsZWdhdGVkKiBhZ2VudCBzcGVuZGluZywgYW5kIHRoZSBleGl0IHBhdGggbXVzdCB3b3JrIGV4YWN0bHkgd2hlbiBsaW1pdHMKYXJlIGV4aGF1c3RlZCBvciBzcGVuZGluZyBpcyBmcm96ZW4uIEVzY3Jvdy1sb2NrZWQgZnVuZHMgc3RheSBsb2NrZWQgKHRoZQpjb21taXRtZW50IHRvIHBheWVlcyBzdXJ2aXZlczsgcmVmdW5kIGlzIHRoZSBlc2NhcGUgaGF0Y2ggZm9yIHRob3NlKS4AAAAAAA5hZG1pbl93aXRoZHJhdwAAAAAAAgAAAAAAAAACdG8AAAAAABMAAAAAAAAABmFtb3VudAAAAAAACwAAAAEAAAPpAAAAAgAAAAM=",
         "AAAAAAAAANtBZG1pbiAodGhlIG93bmVyIC8gaGlyZXIpIGFwcHJvdmVzIGRlbGl2ZXJ5IOKGkiByZWxlYXNlIHRoZSBsb2NrZWQgZnVuZHMgdG8gdGhlCnBheWVlLiBUaGUgcm9sbGluZyB3aW5kb3cgaXMgZW5mb3JjZWQgaGVyZSwgYXQgdGhlIHJlYWwgbW9tZW50IG9mIG91dGZsb3csIGFuZAp0aGUgc3BlbmQgaXMgYWNjb3VudGVkIHBlciB0YXNrIGV4YWN0bHkgbGlrZSBhIGRpcmVjdCBgcGF5YC4AAAAADnJlbGVhc2VfZXNjcm93AAAAAAABAAAAAAAAAAJpZAAAAAAABgAAAAEAAAPpAAAAAgAAAAM=",
         "AAAAAAAAAIhJbnN0YW50bHkgcmV2b2tlIHRoZSBzZXNzaW9uIOKAlCBzcGVuZGluZyBmYWxscyBiYWNrIHRvIHRoZSByb290IGFnZW50LgpBZG1pbi1vbmx5OyBkZWxpYmVyYXRlbHkgd29ya3Mgd2hpbGUgcGF1c2VkIChpbmNpZGVudCByZXNwb25zZSkuAAAADnJldm9rZV9zZXNzaW9uAAAAAAAAAAAAAA==",
+        "AAAAAAAAAWRBZG1pbiB1bmlsYXRlcmFsbHkgY2FuY2VscyBhbiBvcGVuIGVzY3JvdyDigJQgdGhlIGxvY2sgcmV0dXJucyB0byB0aGUgZnJlZQpiYWxhbmNlLCBub3RoaW5nIGlzIHBhaWQsIG5vIGRlYWRsaW5lIG5lZWRlZC4gVGhpcyBpcyB0aGUgaW5jaWRlbnQtcmVzcG9uc2UKcGF0aDogYSBjb21wcm9taXNlZCBhZ2VudCBjb3VsZCBvdGhlcndpc2UgdGllIHVwIHRoZSB3aG9sZSB0cmVhc3VyeSBpbgplc2Nyb3dzIGl0IGFsb25lIGNhbiByZWZ1bmQuIERlbGliZXJhdGVseSB3b3JrcyB3aGlsZSBwYXVzZWQgKGV4aXQgcGF0aCk7CnRoZSBzZXNzaW9uIGJ1ZGdldCBpcyBOT1QgcmVzdG9yZWQgKGNvbnNpc3RlbnQgd2l0aCByZWZ1bmQpLgAAABNhZG1pbl9jYW5jZWxfZXNjcm93AAAAAAEAAAAAAAAAAmlkAAAAAAAGAAAAAQAAA+kAAAACAAAAAw==",
         "AAAAAAAAAEFUaGUgYWN0aXZlIHJlcHV0YXRpb24gZ2F0ZSwgaWYgYW55OiBgKHJlZ2lzdHJ5LCBtaW5fcmVwdXRhdGlvbilgLgAAAAAAABVnZXRfcmVwdXRhdGlvbl9wb2xpY3kAAAAAAAAAAAAAAQAAA+gAAAPtAAAAAgAAABMAAAAL",
         "AAAAAAAAASpTZXQgKG9yIHVwZGF0ZSkgdGhlIHJlcHV0YXRpb24gZ2F0ZS4gQWRtaW4tb25seS4gV2l0aCBgbWluX3JlcHV0YXRpb24gPiAwYCwKYSBwYXllZSB0aGF0IGlzIE5PVCBvbiB0aGUgd2hpdGVsaXN0IGNhbiBzdGlsbCBiZSBwYWlkIHdoZW4gaXRzIHNjb3JlIGZyb20KYHJlZ2lzdHJ5YCBpcyA+PSBgbWluX3JlcHV0YXRpb25gIOKAlCB0dXJuaW5nIHRoZSBzdGF0aWMgYWxsb3dsaXN0IGludG8gYW4KZWFybmVkLXRydXN0IGdhdGUuIFNldCBgbWluX3JlcHV0YXRpb24gPSAwYCB0byBkaXNhYmxlICh3aGl0ZWxpc3Qtb25seSkuAAAAAAAVc2V0X3JlcHV0YXRpb25fcG9saWN5AAAAAAAAAgAAAAAAAAAIcmVnaXN0cnkAAAATAAAAAAAAAA5taW5fcmVwdXRhdGlvbgAAAAAACwAAAAA=" ]),
       options
@@ -335,6 +347,7 @@ export class Client extends ContractClient {
         admin_withdraw: this.txFromJSON<Result<void>>,
         release_escrow: this.txFromJSON<Result<void>>,
         revoke_session: this.txFromJSON<null>,
+        admin_cancel_escrow: this.txFromJSON<Result<void>>,
         get_reputation_policy: this.txFromJSON<Option<readonly [string, i128]>>,
         set_reputation_policy: this.txFromJSON<null>
   }

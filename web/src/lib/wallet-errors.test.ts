@@ -47,8 +47,8 @@ describe("sendErr", () => {
 });
 
 describe("contractErr", () => {
-  it("maps every contract error code (1..11) to its friendly message", () => {
-    for (const code of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]) {
+  it("maps every contract error code (1..12) to its friendly message", () => {
+    for (const code of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
       expect(contractErr(`host error: Error(Contract, #${code})`)).toEqual({
         errorCode: code,
         errorMessage: CONTRACT_ERRORS[code],

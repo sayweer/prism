@@ -21,7 +21,7 @@ import {
 } from "../lib/userTreasury";
 import { EXPLORER, fmtUSDC, SERVICE, shortAddr } from "../config";
 import { fundWithFriendbot, getXlmBalance, needsFunding, MIN_XLM } from "../lib/funding";
-import { connectErr, sendErr } from "../lib/wallet-errors";
+import { connectErr, errText, sendErr } from "../lib/wallet-errors";
 import { trackError, trackViolation } from "../lib/analytics";
 import { logActivity } from "../lib/activity";
 import {
@@ -37,10 +37,23 @@ import Analytics from "./Analytics";
 
 // XLM and USDC are both 7-decimal; fmtUSDC is pure math, so reuse it and label XLM.
 const fmtXlm = (s: bigint) => fmtUSDC(s, 4);
-const errText = (e: unknown) =>
-  e instanceof Error ? e.message : typeof e === "string" ? e : "Something went wrong.";
 
 type Status = { kind: "idle" | "info" | "success" | "error"; msg: string; hash?: string };
+
+// One in-flight wallet action at a time (a wallet signs one tx at a time) — the key
+// names WHICH action runs, so its button can show progress while the rest stay locked.
+type Busy =
+  | null
+  | "deploy"
+  | "fund"
+  | "whitelist"
+  | "spend"
+  | "session"
+  | "revoke"
+  | "task"
+  | "pause"
+  | "withdraw"
+  | "limits";
 
 export default function Workspace() {
   const [address, setAddress] = useState<string | null>(getAddress());
@@ -49,7 +62,7 @@ export default function Workspace() {
   );
   const [state, setState] = useState<PrismState | null>(null);
   const [loading, setLoading] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<Busy>(null);
   const [status, setStatus] = useState<Status>({ kind: "idle", msg: "" });
   const [refreshKey, setRefreshKey] = useState(0);
   // undefined = not checked yet (or Horizon unreachable) → no gate shown; null = no account.
@@ -101,13 +114,20 @@ export default function Workspace() {
     }
   }, []);
 
-  // Stay in sync with the global connection (nav chip connect/disconnect).
+  // Stay in sync with the global connection (nav chip connect/disconnect). On ANY
+  // address change, clear everything derived from the previous wallet — otherwise a
+  // stale status message, session key, or balance can leak into the new context.
   useEffect(
     () =>
       onAddressChange((a) => {
         setAddress(a);
         setTreasuryIdState(a ? getTreasuryId(a) : null);
-        if (!a) setState(null);
+        setState(null);
+        setLifecycle(null);
+        setLegacy(false);
+        setSessionSecret(null);
+        setWalletXlm(undefined);
+        setStatus({ kind: "idle", msg: "" });
       }),
     [],
   );
@@ -183,7 +203,7 @@ export default function Workspace() {
       setStatus({ kind: "error", msg: "Per-payment limit can't exceed the daily limit." });
       return;
     }
-    setBusy(true);
+    setBusy("deploy");
     setStatus({ kind: "info", msg: "Deploying your treasury — confirm in your wallet…" });
     try {
       const id = await deployTreasury(address, walletSignerFor(address), Number(daily), Number(perTask));
@@ -204,13 +224,13 @@ export default function Workspace() {
       setStatus({
         kind: "success",
         msg: registered
-          ? "Treasury deployed ✓ and registered on-chain — recoverable from any device. Copy your ID as a backup anyway."
-          : "Treasury deployed ✓ — on-chain registration was skipped, so copy your treasury ID (top of the card) and keep it: it's how you reopen this treasury from another browser or device.",
+          ? "Treasury deployed ✓ and registered on-chain — recoverable from any device."
+          : "Treasury deployed ✓ — on-chain registration was skipped, so your ID (above) is the only key to this treasury: copy it now.",
       });
     } catch (e) {
       setStatus({ kind: "error", msg: sendErr(e) });
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }, [address, daily, perTask]);
 
@@ -242,7 +262,7 @@ export default function Workspace() {
 
   const fund = useCallback(async () => {
     if (!address || !treasuryId) return;
-    setBusy(true);
+    setBusy("fund");
     setStatus({ kind: "info", msg: "Funding — confirm in your wallet…" });
     try {
       const hash = await fundTreasury(treasuryId, address, walletSignerFor(address), Number(fundAmt));
@@ -255,13 +275,13 @@ export default function Workspace() {
     } catch (e) {
       setStatus({ kind: "error", msg: sendErr(e) });
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }, [address, treasuryId, fundAmt, loadState, refreshWalletXlm]);
 
   const whitelist = useCallback(async () => {
     if (!address || !treasuryId) return;
-    setBusy(true);
+    setBusy("whitelist");
     setStatus({ kind: "info", msg: "Whitelisting payee — confirm in your wallet…" });
     try {
       const p = payee.trim();
@@ -274,7 +294,7 @@ export default function Workspace() {
     } catch (e) {
       setStatus({ kind: "error", msg: sendErr(e) });
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }, [address, treasuryId, payee]);
 
@@ -287,7 +307,7 @@ export default function Workspace() {
       });
       return;
     }
-    setBusy(true);
+    setBusy("spend");
     setStatus({
       kind: "info",
       msg: sessionActive ? "Sending payment — signed by the session agent…" : "Sending payment — confirm in your wallet…",
@@ -322,7 +342,7 @@ export default function Workspace() {
       trackError(treasuryId, errText(e)); // raw message for monitoring; the classified one for the user
       setStatus({ kind: "error", msg: sendErr(e) });
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }, [address, treasuryId, payTo, payAmt, sessionActive, sessionSecret, loadState]);
 
@@ -330,11 +350,19 @@ export default function Workspace() {
 
   const startSession = useCallback(async () => {
     if (!address || !treasuryId) return;
-    setBusy(true);
-    setStatus({ kind: "info", msg: "Starting agent session — funding its key, then confirm in your wallet…" });
+    setBusy("session");
+    setStatus({ kind: "info", msg: "Starting agent session — confirm in your wallet…" });
     try {
       const t = makeTreasury(treasuryId, address, walletSignerFor(address));
-      const res = await createSession(t, treasuryId, Number(sessionCap), Number(sessionHours));
+      const res = await createSession(t, treasuryId, Number(sessionCap), Number(sessionHours), (phase) =>
+        setStatus({
+          kind: "info",
+          msg:
+            phase === "registering"
+              ? "Registering the session — confirm in your wallet…"
+              : "Funding the agent's key on testnet…",
+        }),
+      );
       if (res.ok) {
         setSessionSecret(loadSessionSecret(treasuryId));
         void logActivity({ walletAddress: address, treasuryId, action: "session_start", txHash: res.hash });
@@ -350,13 +378,13 @@ export default function Workspace() {
     } catch (e) {
       setStatus({ kind: "error", msg: sendErr(e) });
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }, [address, treasuryId, sessionCap, sessionHours, loadState]);
 
   const endSession = useCallback(async () => {
     if (!address || !treasuryId) return;
-    setBusy(true);
+    setBusy("revoke");
     setStatus({ kind: "info", msg: "Revoking session — confirm in your wallet…" });
     try {
       const t = makeTreasury(treasuryId, address, walletSignerFor(address));
@@ -373,14 +401,14 @@ export default function Workspace() {
     } catch (e) {
       setStatus({ kind: "error", msg: sendErr(e) });
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }, [address, treasuryId, loadState]);
 
   const runAutonomousTask = useCallback(async () => {
     if (!address || !treasuryId || !sessionSecret) return;
     const to = payTo.trim() || SERVICE;
-    setBusy(true);
+    setBusy("task");
     setStatus({ kind: "info", msg: "Agent is paying autonomously — no wallet popup…" });
     try {
       const res = await sessionPay(treasuryId, sessionSecret, BigInt(Date.now()), to, 1);
@@ -402,7 +430,7 @@ export default function Workspace() {
       trackError(treasuryId, errText(e));
       setStatus({ kind: "error", msg: sendErr(e) });
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }, [address, treasuryId, sessionSecret, payTo, loadState]);
 
@@ -411,7 +439,7 @@ export default function Workspace() {
   const togglePause = useCallback(async () => {
     if (!address || !treasuryId || !lifecycle) return;
     const next = !lifecycle.paused;
-    setBusy(true);
+    setBusy("pause");
     setStatus({ kind: "info", msg: `${next ? "Pausing" : "Resuming"} — confirm in your wallet…` });
     try {
       const t = makeTreasury(treasuryId, address, walletSignerFor(address));
@@ -426,13 +454,13 @@ export default function Workspace() {
     } catch (e) {
       setStatus({ kind: "error", msg: sendErr(e) });
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }, [address, treasuryId, lifecycle, loadState]);
 
   const withdraw = useCallback(async () => {
     if (!address || !treasuryId) return;
-    setBusy(true);
+    setBusy("withdraw");
     setStatus({ kind: "info", msg: "Withdrawing — confirm in your wallet…" });
     try {
       const t = makeTreasury(treasuryId, address, walletSignerFor(address));
@@ -450,7 +478,7 @@ export default function Workspace() {
     } catch (e) {
       setStatus({ kind: "error", msg: sendErr(e) });
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }, [address, treasuryId, withdrawTo, withdrawAmt, loadState, refreshWalletXlm]);
 
@@ -460,7 +488,7 @@ export default function Workspace() {
       setStatus({ kind: "error", msg: "Per-payment limit can't exceed the daily limit." });
       return;
     }
-    setBusy(true);
+    setBusy("limits");
     setStatus({ kind: "info", msg: "Updating limits — confirm in your wallet…" });
     try {
       const t = makeTreasury(treasuryId, address, walletSignerFor(address));
@@ -477,7 +505,7 @@ export default function Workspace() {
     } catch (e) {
       setStatus({ kind: "error", msg: sendErr(e) });
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }, [address, treasuryId, newDaily, newPerTask, loadState]);
 
@@ -518,17 +546,23 @@ export default function Workspace() {
           <>
             <p style={sub}>
               Connected as <span style={mono}>{shortAddr(address)}</span>. Create your treasury — you
-              set the limits, the contract enforces them.
+              set the limits, the contract enforces them. Your treasury runs on{" "}
+              <strong>testnet XLM</strong> (the guided demo uses test USDC).
             </p>
             <div style={label}>Daily limit (XLM)</div>
-            <input style={input} inputMode="decimal" value={daily} onChange={(e) => setDaily(e.target.value)} />
+            <input style={input} inputMode="decimal" aria-label="Daily limit in XLM" value={daily} onChange={(e) => setDaily(e.target.value)} />
             <div style={label}>Per-payment limit (XLM)</div>
-            <input style={input} inputMode="decimal" value={perTask} onChange={(e) => setPerTask(e.target.value)} />
-            <button style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }} onClick={create} disabled={busy}>
-              {busy ? "Deploying…" : "Create treasury"}
+            <input style={input} inputMode="decimal" aria-label="Per-payment limit in XLM" value={perTask} onChange={(e) => setPerTask(e.target.value)} />
+            <button style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }} onClick={create} disabled={!!busy}>
+              {busy === "deploy" ? "Deploying…" : "Create treasury"}
             </button>
+            <div style={hintRow}>
+              Deploying asks for <strong>two</strong> wallet approvals: ① create the treasury,
+              ② register it for cross-device recovery — ② is optional; skipping it just means
+              you should back up your treasury ID.
+            </div>
             <div style={{ ...label, marginTop: 18 }}>Or open an existing treasury</div>
-            <input style={input} placeholder="Treasury contract id (C…)" value={existing} onChange={(e) => setExisting(e.target.value)} />
+            <input style={input} placeholder="Treasury contract id (C…)" aria-label="Existing treasury contract id" value={existing} onChange={(e) => setExisting(e.target.value)} />
             <button style={ghostBtn} onClick={useExisting}>Open it</button>
           </>
         ) : (
@@ -550,6 +584,12 @@ export default function Workspace() {
                 <div style={mono}>{shortAddr(address)}</div>
               </div>
             </div>
+            {/* Persistent — critical instructions can't live only in the transient status
+                slot, where the next action's message would erase them. */}
+            <div style={hintRow}>
+              Back up your treasury ID (Copy ID) — it reopens this treasury from any browser
+              or device.
+            </div>
 
             {loading || !state ? (
               <div style={{ ...balanceBox, color: "#A0A0B8" }}>Reading treasury…</div>
@@ -570,26 +610,34 @@ export default function Workspace() {
             )}
 
             <Section title="Fund treasury">
-              <input style={input} inputMode="decimal" placeholder="Amount (XLM)" value={fundAmt} onChange={(e) => setFundAmt(e.target.value)} />
-              <button style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }} onClick={fund} disabled={busy}>Fund</button>
+              <input style={input} inputMode="decimal" placeholder="Amount (XLM)" aria-label="Fund amount in XLM" value={fundAmt} onChange={(e) => setFundAmt(e.target.value)} />
+              <button style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }} onClick={fund} disabled={!!busy}>
+                {busy === "fund" ? "Funding…" : "Fund"}
+              </button>
             </Section>
 
             <Section title="Whitelist a payee">
-              <input style={input} placeholder="Payee address (G… or C…)" value={payee} onChange={(e) => setPayee(e.target.value)} />
+              <input style={input} placeholder="Payee address (G… or C…)" aria-label="Payee address" value={payee} onChange={(e) => setPayee(e.target.value)} />
               <div style={hintRow}>
                 No second address handy?{" "}
                 <button style={inlineLink} type="button" onClick={() => setPayee(SERVICE)}>
                   use the sample vendor ({shortAddr(SERVICE)})
                 </button>
               </div>
-              <button style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }} onClick={whitelist} disabled={busy}>Add payee</button>
+              <button style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }} onClick={whitelist} disabled={!!busy}>
+                {busy === "whitelist" ? "Adding…" : "Add payee"}
+              </button>
             </Section>
 
             <Section title="Spend">
-              <input style={input} placeholder="To (whitelisted address)" value={payTo} onChange={(e) => setPayTo(e.target.value)} />
-              <input style={input} inputMode="decimal" placeholder="Amount (XLM)" value={payAmt} onChange={(e) => setPayAmt(e.target.value)} />
-              <button style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }} onClick={spend} disabled={busy}>
-                {sessionActive ? "Send payment (agent signs — no popup)" : "Send payment"}
+              <input style={input} placeholder="To (whitelisted address)" aria-label="Payment destination address" value={payTo} onChange={(e) => setPayTo(e.target.value)} />
+              <input style={input} inputMode="decimal" placeholder="Amount (XLM)" aria-label="Payment amount in XLM" value={payAmt} onChange={(e) => setPayAmt(e.target.value)} />
+              <button style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }} onClick={spend} disabled={!!busy}>
+                {busy === "spend"
+                  ? "Sending…"
+                  : sessionActive
+                    ? "Send payment (agent signs — no popup)"
+                    : "Send payment"}
               </button>
             </Section>
 
@@ -603,8 +651,10 @@ export default function Workspace() {
                       {new Date(Number(lifecycle.session.valid_until) * 1000).toLocaleString()}
                     </div>
                     {sessionSecret ? (
-                      <button style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }} onClick={runAutonomousTask} disabled={busy}>
-                        Run autonomous task (1 XLM — no popup)
+                      <button style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }} onClick={runAutonomousTask} disabled={!!busy}>
+                        {busy === "task"
+                          ? "Agent paying…"
+                          : `Run autonomous task (1 XLM → ${shortAddr(payTo.trim() || SERVICE)}, no popup)`}
                       </button>
                     ) : (
                       <div style={hintRow}>
@@ -612,8 +662,8 @@ export default function Workspace() {
                         session to spend from here.
                       </div>
                     )}
-                    <button style={{ ...ghostBtn, opacity: busy ? 0.6 : 1 }} onClick={endSession} disabled={busy}>
-                      Revoke session
+                    <button style={{ ...ghostBtn, opacity: busy ? 0.6 : 1 }} onClick={endSession} disabled={!!busy}>
+                      {busy === "revoke" ? "Revoking…" : "Revoke session"}
                     </button>
                   </>
                 ) : (
@@ -623,10 +673,10 @@ export default function Workspace() {
                       key signs payments with no wallet popups — the contract still enforces
                       every limit.
                     </div>
-                    <input style={input} inputMode="decimal" placeholder="Session cap (XLM)" value={sessionCap} onChange={(e) => setSessionCap(e.target.value)} />
-                    <input style={input} inputMode="decimal" placeholder="Duration (hours)" value={sessionHours} onChange={(e) => setSessionHours(e.target.value)} />
-                    <button style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }} onClick={startSession} disabled={busy}>
-                      Start agent session
+                    <input style={input} inputMode="decimal" placeholder="Session cap (XLM)" aria-label="Session spending cap in XLM" value={sessionCap} onChange={(e) => setSessionCap(e.target.value)} />
+                    <input style={input} inputMode="decimal" placeholder="Duration (hours)" aria-label="Session duration in hours" value={sessionHours} onChange={(e) => setSessionHours(e.target.value)} />
+                    <button style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }} onClick={startSession} disabled={!!busy}>
+                      {busy === "session" ? "Starting…" : "Start agent session"}
                     </button>
                   </>
                 )}
@@ -643,17 +693,21 @@ export default function Workspace() {
             ) : (
               lifecycle && (
                 <Section title="Controls">
-                  <button style={{ ...ghostBtn, opacity: busy ? 0.6 : 1 }} onClick={togglePause} disabled={busy}>
-                    {lifecycle.paused ? "Resume spending" : "Pause spending"}
+                  <button style={{ ...ghostBtn, opacity: busy ? 0.6 : 1 }} onClick={togglePause} disabled={!!busy}>
+                    {busy === "pause" ? "Working…" : lifecycle.paused ? "Resume spending" : "Pause spending"}
                   </button>
                   <div style={{ ...label, marginTop: 12 }}>Withdraw (owner exit — works while paused)</div>
-                  <input style={input} placeholder={`To (default: your wallet ${shortAddr(address)})`} value={withdrawTo} onChange={(e) => setWithdrawTo(e.target.value)} />
-                  <input style={input} inputMode="decimal" placeholder="Amount (XLM)" value={withdrawAmt} onChange={(e) => setWithdrawAmt(e.target.value)} />
-                  <button style={{ ...ghostBtn, opacity: busy ? 0.6 : 1 }} onClick={withdraw} disabled={busy}>Withdraw</button>
+                  <input style={input} placeholder={`To (default: your wallet ${shortAddr(address)})`} aria-label="Withdraw destination address" value={withdrawTo} onChange={(e) => setWithdrawTo(e.target.value)} />
+                  <input style={input} inputMode="decimal" placeholder="Amount (XLM)" aria-label="Withdraw amount in XLM" value={withdrawAmt} onChange={(e) => setWithdrawAmt(e.target.value)} />
+                  <button style={{ ...ghostBtn, opacity: busy ? 0.6 : 1 }} onClick={withdraw} disabled={!!busy}>
+                    {busy === "withdraw" ? "Withdrawing…" : "Withdraw"}
+                  </button>
                   <div style={{ ...label, marginTop: 12 }}>Update limits (effective immediately)</div>
-                  <input style={input} inputMode="decimal" placeholder="New daily limit (XLM)" value={newDaily} onChange={(e) => setNewDaily(e.target.value)} />
-                  <input style={input} inputMode="decimal" placeholder="New per-payment limit (XLM)" value={newPerTask} onChange={(e) => setNewPerTask(e.target.value)} />
-                  <button style={{ ...ghostBtn, opacity: busy ? 0.6 : 1 }} onClick={updateLimits} disabled={busy}>Update limits</button>
+                  <input style={input} inputMode="decimal" placeholder="New daily limit (XLM)" aria-label="New daily limit in XLM" value={newDaily} onChange={(e) => setNewDaily(e.target.value)} />
+                  <input style={input} inputMode="decimal" placeholder="New per-payment limit (XLM)" aria-label="New per-payment limit in XLM" value={newPerTask} onChange={(e) => setNewPerTask(e.target.value)} />
+                  <button style={{ ...ghostBtn, opacity: busy ? 0.6 : 1 }} onClick={updateLimits} disabled={!!busy}>
+                    {busy === "limits" ? "Updating…" : "Update limits"}
+                  </button>
                 </Section>
               )
             )}

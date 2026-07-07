@@ -1060,6 +1060,80 @@ fn lifecycle_fns_require_admin() {
     assert!(client.try_set_agent(&out).is_err());
 }
 
+/// Escrow deadlines must be in the future — a past deadline would be an instant
+/// no-op refund that still burns session budget.
+#[test]
+fn escrow_rejects_past_deadline() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (payee, client, _token) = setup(&env, 1000_i128, 100_i128);
+    client.add_payee(&payee);
+
+    env.ledger().with_mut(|li| li.timestamp = 1_000);
+    assert_eq!(
+        client.try_create_escrow(&1_u64, &payee, &50_i128, &1_000_u64), // deadline == now
+        Err(Ok(Error::InvalidDeadline))
+    );
+    assert_eq!(
+        client.try_create_escrow(&1_u64, &payee, &50_i128, &500_u64), // deadline < now
+        Err(Ok(Error::InvalidDeadline))
+    );
+    client.create_escrow(&1_u64, &payee, &50_i128, &2_000_u64); // future — fine
+}
+
+/// The admin can unilaterally cancel an open escrow: the lock returns to the free
+/// balance, nobody gets paid, and no deadline is needed — the incident-response
+/// path against a compromised agent locking up the treasury.
+#[test]
+fn admin_cancel_escrow_unlocks_without_paying() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (payee, client, token) = setup(&env, 1000_i128, 500_i128);
+    client.add_payee(&payee);
+
+    let id = client.create_escrow(&1_u64, &payee, &400_i128, &SECONDS_PER_DAY);
+    assert_eq!(client.locked(), 400);
+
+    client.admin_cancel_escrow(&id);
+    assert_eq!(client.locked(), 0);
+    assert_eq!(token.balance(&payee), 0); // nothing paid
+    assert_eq!(client.balance(), 500); // funds stayed in the treasury
+    assert!(client.get_escrow(&id).is_none());
+
+    // The freed funds are immediately withdrawable by the owner.
+    let out = Address::generate(&env);
+    client.admin_withdraw(&out, &500_i128);
+    assert_eq!(token.balance(&out), 500);
+}
+
+/// Cancel is admin-gated, works while paused, and surfaces EscrowNotFound.
+#[test]
+fn admin_cancel_works_while_paused_and_requires_admin() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (payee, client, _token) = setup(&env, 1000_i128, 100_i128);
+    client.add_payee(&payee);
+    let id = client.create_escrow(&1_u64, &payee, &60_i128, &SECONDS_PER_DAY);
+
+    assert_eq!(
+        client.try_admin_cancel_escrow(&999_u64),
+        Err(Ok(Error::EscrowNotFound))
+    );
+
+    client.set_paused(&true);
+    client.admin_cancel_escrow(&id); // exit paths never lock
+    assert_eq!(client.locked(), 0);
+
+    let id2_setup = || {
+        client.set_paused(&false);
+        let id2 = client.create_escrow(&2_u64, &payee, &10_i128, &SECONDS_PER_DAY);
+        id2
+    };
+    let id2 = id2_setup();
+    env.set_auths(&[]);
+    assert!(client.try_admin_cancel_escrow(&id2).is_err()); // not without the admin
+}
+
 // --- M2: constructor validation ---------------------------------------------------
 
 /// A treasury can never exist with a self-contradicting policy (C5 closure).

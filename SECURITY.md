@@ -42,6 +42,17 @@ product shipped. No critical findings. Status of every finding:
 | F4 | Low | No CSP / security headers on the static site | ⚠️ Open — testnet demo scope |
 | — | Info | npm audit 0 CVEs · pinned lockfile · no postinstall scripts · clean git history | ✅ Verified at audit time |
 
+A second fresh-eyes review (agent-assisted, **2026-07-07**, after M2 shipped) found and
+fixed in **v3.1** the same day:
+
+| ID | Severity | Finding | Status |
+|----|----------|---------|--------|
+| R1 | Medium | No admin path to reclaim escrow-locked funds — a compromised agent could tie up the whole treasury in escrows only it could refund | ✅ Fixed — `admin_cancel_escrow` (owner-signed, works while paused, pays nobody) |
+| R2 | Medium | Escrow entries (persistent) could theoretically be archived before a far-future deadline while `Locked` (instance) kept counting them | ✅ Fixed — escrow TTL extended past its deadline at creation |
+| R3 | Low | `create_escrow` accepted past deadlines (instant-refund no-op that still burned session budget) | ✅ Fixed — `InvalidDeadline` (#12) |
+| R4 | Low | Whitelist / reputation-gate mutations emitted no events (monitoring blind spot) | ✅ Fixed — `payee_add` / `payee_rm` / `rep_gate` events |
+| R5 | Low | Wallet-kit module selection reset to Freighter on page reload — a reconnected non-Freighter (incl. WalletConnect mobile) session would sign through the wrong wallet | ✅ Fixed — selected wallet persisted and restored |
+
 ## Known limitations (honest scope)
 
 - **Contracts are immutable — deliberately.** M2 shipped the lifecycle (pause/resume,

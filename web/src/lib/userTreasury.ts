@@ -11,17 +11,18 @@ import {
   TransactionBuilder,
 } from "@stellar/stellar-sdk";
 import { Client, type Session } from "./treasuryClient";
-import { contractErr } from "./wallet-errors";
+import { contractErr, errText } from "./wallet-errors";
 import type { ContractSigner } from "./walletSigner";
 import { NETWORK_PASSPHRASE, RPC_URL } from "../config";
 
 // Native XLM SAC on testnet — the token each user treasury holds and spends.
 export const XLM_SAC = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC";
 // Treasury WASM already installed on-chain — deploy just instantiates a new contract from it.
-// v3 (M2: agent sessions + lifecycle + rolling 24h window), installed 2026-07-07:
-// https://stellar.expert/explorer/testnet/tx/aa81495db875d28715acb056614614bd04094b4aaf67f80b05ffefd0ec590bef
+// v3.1 (audit hardening: admin_cancel_escrow + deadline validation + escrow TTL +
+// whitelist/rep-gate events), installed 2026-07-07:
+// https://stellar.expert/explorer/testnet/tx/e12e748bdaafa39a08c2bfe56e009fa507f951d93af16455cb7ece019a243b3c
 export const TREASURY_WASM_HASH =
-  "2e6ab69e964b85a1954443d067d809c8519a20eb909fd16ac23abab318f184b8";
+  "7e103d8c177f3b46d4f7ccee695e7c9a92f5d3e5e55b96324173f923db9f9ae7";
 
 const XLM_UNIT = 10_000_000;
 
@@ -53,6 +54,9 @@ export interface PayResult {
   hash?: string;
   errorCode?: number;
   errorMessage?: string;
+  /** true = an infra/concurrency hiccup (stale sequence, RPC busy), NOT a contract
+   *  guardrail rejection — safe to retry. Only the shared-agent demo path sets it. */
+  transient?: boolean;
 }
 
 /** A treasury Client bound to a runtime contract id + the connected wallet as signer. */
@@ -154,7 +158,7 @@ export async function removePayee(treasury: Client, payee: string): Promise<void
 }
 
 /** Build → sign → send a contract tx, mapping on-chain guardrail rejections
- *  (#1..#11) to friendly messages. Shared by every state-changing treasury call. */
+ *  to friendly messages. Shared by every state-changing treasury call. */
 async function sendTx(
   build: () => Promise<{ signAndSend: () => Promise<unknown> }>,
   failMsg: string,
@@ -166,7 +170,7 @@ async function sendTx(
       ?.hash;
     return { ok: true, hash };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : typeof e === "string" ? e : JSON.stringify(e);
+    const msg = errText(e);
     const ce = contractErr(msg);
     if (ce) return { ok: false, ...ce };
     return { ok: false, errorMessage: msg.slice(0, 160) || failMsg };
@@ -174,7 +178,7 @@ async function sendTx(
 }
 
 /** Spend from the treasury. The contract enforces the policy and rejects violations
- *  on-chain (#1..#11) — those rejections are the product working, surfaced as messages. */
+ *  on-chain — those rejections are the product working, surfaced as messages. */
 export async function pay(
   treasury: Client,
   taskId: bigint,

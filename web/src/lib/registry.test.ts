@@ -15,10 +15,19 @@ vi.mock("./registryClient", () => ({
 
 import { discoverTreasuries, registerTreasury } from "./registry";
 
+// Real, checksum-valid contract ids — discoverTreasuries StrKey-filters its results.
+const T1 = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC";
+const T2 = "CBEPVXK6BN2FZ3IYHV5KQUGROFHNBWBYHKHRZ5U3O7UWGIOPFOFE4ZE7";
+
 describe("discoverTreasuries", () => {
   it("returns the wallet's registered treasuries", async () => {
-    mocks.treasuries_of.mockResolvedValueOnce({ result: ["C1", "C2"] });
-    expect(await discoverTreasuries("GADDR")).toEqual(["C1", "C2"]);
+    mocks.treasuries_of.mockResolvedValueOnce({ result: [T1, T2] });
+    expect(await discoverTreasuries("GADDR")).toEqual([T1, T2]);
+  });
+
+  it("filters malformed ids so a bad registry entry can't wedge the workspace", async () => {
+    mocks.treasuries_of.mockResolvedValueOnce({ result: ["not-a-contract", T1, "C1"] });
+    expect(await discoverTreasuries("GADDR")).toEqual([T1]);
   });
 
   it("returns [] when the registry is unreachable (recovery must never break connect)", async () => {

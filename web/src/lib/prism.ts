@@ -4,7 +4,7 @@
 import { Keypair } from "@stellar/stellar-sdk";
 import { basicNodeSigner } from "@stellar/stellar-sdk/contract";
 import { Client } from "./treasuryClient";
-import { contractErr } from "./wallet-errors";
+import { contractErr, errText } from "./wallet-errors";
 import {
   AGENT_PK,
   AGENT_SECRET,
@@ -24,15 +24,10 @@ const treasury = new Client({
   signTransaction: signer.signTransaction,
 });
 
-export interface PrismState {
-  balance: bigint;
-  daySpent: bigint;
-  dailyLimit: bigint;
-  perTaskLimit: bigint;
-  admin: string;
-  agent: string;
-  token: string;
-}
+// One shape across the demo (this file) and the per-user product (userTreasury.ts) —
+// re-exported here so Dashboard's imports keep working from a single definition.
+export type { PayResult, PrismState } from "./userTreasury";
+import type { PayResult, PrismState } from "./userTreasury";
 
 export async function readState(): Promise<PrismState> {
   const [bal, cfg, day] = await Promise.all([
@@ -56,28 +51,14 @@ export async function readTaskSpent(taskId: bigint): Promise<bigint> {
   return (await treasury.task_spent({ task_id: taskId })).result;
 }
 
-export interface PayResult {
-  ok: boolean;
-  hash?: string;
-  errorCode?: number;
-  errorMessage?: string;
-  /** true = an infra/concurrency hiccup (e.g. many users submitting at once →
-   *  stale sequence), NOT a contract guardrail rejection. Safe to retry. */
-  transient?: boolean;
-}
-
 const MAX_TRIES = 5;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-function errText(e: unknown): string {
-  return e instanceof Error ? e.message : typeof e === "string" ? e : JSON.stringify(e);
-}
-
 /** Transient infra / concurrency errors — several judges submitting at the same
  *  instant share one agent account, so a tx can land on a stale sequence. These
- *  are safe to retry after re-fetching the sequence. */
-function isTransient(msg: string): boolean {
-  return /bad[_ ]?seq|sequence|tx_too_late|too[_ ]?late|timeout|timed out|deadline|429|too many|rate limit|50\d\b|service unavailable|temporar|unavailable|connection|network|fetch failed|failed to fetch|econn|reset by peer|try again/i.test(
+ *  are safe to retry after re-fetching the sequence. Exported for tests. */
+export function isTransient(msg: string): boolean {
+  return /bad[_ ]?seq|sequence|tx_too_late|too[_ ]?late|timeout|timed out|deadline|429|too many|rate limit|50\d\b|service unavailable|temporar|unavailable|connection|network|fetch failed|failed to fetch|econn|reset by peer|try[_ ]?again/i.test(
     msg,
   );
 }
@@ -102,8 +83,13 @@ export async function agentPay(
       const msg = errText(e);
       lastMsg = msg;
       const ce = contractErr(msg);
-      if (ce) return { ok: false, ...ce }; // real guardrail rejection (#1..#8) — surface it
-      if (attempt < MAX_TRIES - 1 && isTransient(msg)) {
+      if (ce) return { ok: false, ...ce }; // real guardrail rejection — surface it, never retry
+      if (!isTransient(msg)) {
+        // A permanent failure (bad destination, malformed tx, …) — don't invite
+        // the user to retry something that will fail forever.
+        return { ok: false, errorMessage: msg.slice(0, 120) || "Payment failed." };
+      }
+      if (attempt < MAX_TRIES - 1) {
         // back off with jitter so concurrent clients de-synchronise, then retry
         await sleep(220 * (attempt + 1) + Math.floor(Math.random() * 400));
         continue;

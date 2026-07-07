@@ -27,6 +27,7 @@ pub enum Error {
     Paused = 9,
     ExceedsSessionLimit = 10,
     InvalidLimits = 11,
+    InvalidDeadline = 12,
 }
 
 #[contracttype]
@@ -100,6 +101,11 @@ pub trait ReputationOracle {
 const SECONDS_PER_HOUR: u64 = 3_600;
 const WINDOW_HOURS: u64 = 24;
 const SECONDS_PER_DAY: u64 = 86_400;
+// Ledgers close ~every 5s. Escrow entries get their TTL extended past the deadline so a
+// far-future escrow can never be archived while `Locked` still counts it (which would
+// strand the funds: unreadable entry, permanently inflated lock).
+const LEDGERS_PER_WEEK: u32 = 120_960;
+const MAX_TTL_LEDGERS: u32 = 3_110_400; // ≈ 6 months of 5s ledgers (order of the network cap)
 
 #[contract]
 pub struct Treasury;
@@ -134,14 +140,20 @@ impl Treasury {
     pub fn add_payee(env: Env, payee: Address) {
         let cfg = Self::cfg(&env);
         cfg.admin.require_auth();
-        env.storage().persistent().set(&DataKey::Payee(payee), &true);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Payee(payee.clone()), &true);
+        env.events().publish((symbol_short!("payee_add"),), payee);
     }
 
     /// Remove a payee from the whitelist. Admin-only.
     pub fn remove_payee(env: Env, payee: Address) {
         let cfg = Self::cfg(&env);
         cfg.admin.require_auth();
-        env.storage().persistent().remove(&DataKey::Payee(payee));
+        env.storage()
+            .persistent()
+            .remove(&DataKey::Payee(payee.clone()));
+        env.events().publish((symbol_short!("payee_rm"),), payee);
     }
 
     /// Set (or update) the reputation gate. Admin-only. With `min_reputation > 0`,
@@ -151,10 +163,14 @@ impl Treasury {
     pub fn set_reputation_policy(env: Env, registry: Address, min_reputation: i128) {
         let cfg = Self::cfg(&env);
         cfg.admin.require_auth();
-        env.storage().instance().set(&DataKey::RepRegistry, &registry);
+        env.storage()
+            .instance()
+            .set(&DataKey::RepRegistry, &registry);
         env.storage()
             .instance()
             .set(&DataKey::MinReputation, &min_reputation);
+        env.events()
+            .publish((symbol_short!("rep_gate"),), (registry, min_reputation));
     }
 
     /// The active reputation gate, if any: `(registry, min_reputation)`.
@@ -392,6 +408,10 @@ impl Treasury {
         if amount <= 0 {
             return Err(Error::InvalidAmount);
         }
+        let now = env.ledger().timestamp();
+        if deadline <= now {
+            return Err(Error::InvalidDeadline);
+        }
         Self::payee_allowed(&env, &payee)?;
         if amount > cfg.per_task_limit {
             return Err(Error::ExceedsTaskLimit);
@@ -423,6 +443,12 @@ impl Treasury {
         env.storage()
             .persistent()
             .set(&DataKey::EscrowEntry(id), &escrow);
+        // Keep the entry alive comfortably past its deadline (see TTL constants above) —
+        // otherwise `Locked` (instance) could outlive an archived entry and strand funds.
+        let ttl = (((deadline - now) / 5) + LEDGERS_PER_WEEK as u64).min(MAX_TTL_LEDGERS as u64) as u32;
+        env.storage()
+            .persistent()
+            .extend_ttl(&DataKey::EscrowEntry(id), ttl, ttl);
         env.storage().instance().set(&DataKey::NextEscrowId, &(id + 1));
         env.storage().instance().set(&DataKey::Locked, &(locked + amount));
         if let Some(mut s) = session {
@@ -498,6 +524,30 @@ impl Treasury {
 
         env.events()
             .publish((symbol_short!("refunded"), id), (escrow.payee, escrow.amount));
+        Ok(())
+    }
+
+    /// Admin unilaterally cancels an open escrow — the lock returns to the free
+    /// balance, nothing is paid, no deadline needed. This is the incident-response
+    /// path: a compromised agent could otherwise tie up the whole treasury in
+    /// escrows it alone can refund. Deliberately works while paused (exit path);
+    /// the session budget is NOT restored (consistent with refund).
+    pub fn admin_cancel_escrow(env: Env, id: u64) -> Result<(), Error> {
+        let cfg = Self::cfg(&env);
+        cfg.admin.require_auth();
+        let escrow: Escrow = env
+            .storage()
+            .persistent()
+            .get(&DataKey::EscrowEntry(id))
+            .ok_or(Error::EscrowNotFound)?;
+
+        env.storage().persistent().remove(&DataKey::EscrowEntry(id));
+        env.storage()
+            .instance()
+            .set(&DataKey::Locked, &(Self::locked(env.clone()) - escrow.amount));
+
+        env.events()
+            .publish((symbol_short!("cancelled"), id), (escrow.payee, escrow.amount));
         Ok(())
     }
 

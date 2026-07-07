@@ -4,6 +4,32 @@ Notable changes to PRISM, grouped by release wave. Full detail lives in the
 [conventional-commit history](https://github.com/Bekirerdem/prism/commits/main);
 deployed addresses and on-chain proofs in [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
+## [0.4.1] — 2026-07-07 · Fresh-eyes review wave (treasury v3.1 + UX hardening)
+
+A four-track independent review (contracts, web libs, UX flow, cross-consistency)
+before the user-acquisition push; every confirmed finding fixed the same day.
+
+- **Fixed (contract v3.1)** — `admin_cancel_escrow`: the owner can unilaterally unwind an
+  open escrow (a compromised agent could previously tie up the whole treasury in escrows
+  only it could refund) · escrow deadlines validated (`#12 InvalidDeadline`) · escrow
+  entries get TTL extended past their deadline (archived-entry / stranded-`Locked` risk) ·
+  whitelist + reputation-gate mutations now emit events (`payee_add`/`payee_rm`/`rep_gate`)
+  · 48 tests
+- **Fixed (web)** — selected wallet module persisted across reloads (a reconnected
+  xBull/Lobstr/WalletConnect session no longer signs through Freighter) · `agentPay` stops
+  labeling permanent failures as retryable (+ `TRY_AGAIN_LATER` now retried) · session
+  start signs first, friendbot-funds after (declines no longer burn rate-limited friendbot
+  calls) · corrupted session keys get a guided message · registry recovery StrKey-filters
+  ids · per-action busy states (buttons show progress; no more frozen-app feel) · stale
+  wallet state fully reset on account switch · persistent "back up your ID" hint (was a
+  transient status message the next action erased) · XLM/USDC expectation set before
+  deploy + two-approval flow explained upfront · `PayResult`/`PrismState`/`errText`
+  single-sourced · `prism.ts` finally under test (92 web tests)
+- **Docs** — circuit test count 6/6 · dated milestone counts in DEPLOYMENT · TRY-IT
+  (EN/TR) covers agent sessions + owner controls · per-package READMEs
+  (treasury-client/registry-client/prover) · prover on stellar-sdk v14 · SECURITY gains
+  the review-wave findings table
+
 ## [0.4.0] — 2026-07-07 · M2 agent infrastructure (treasury v3 + registry)
 
 The gap between "a human signs every payment" and "an agent spends autonomously,

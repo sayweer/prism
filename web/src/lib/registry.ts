@@ -3,6 +3,7 @@
 // fresh device we can recover it with an unsigned simulation — localStorage is
 // no longer the only copy of "which treasury is mine".
 import { Client } from "./registryClient";
+import { isValidContractId } from "./userTreasury";
 import type { ContractSigner } from "./walletSigner";
 import { NETWORK_PASSPHRASE, REGISTRY_ID, RPC_URL } from "../config";
 
@@ -28,11 +29,12 @@ export async function registerTreasury(
 }
 
 /** Every treasury this wallet registered, oldest → newest — an unsigned read.
- *  Returns [] when the wallet has none or the registry is unreachable. */
+ *  Returns [] when the wallet has none or the registry is unreachable; malformed
+ *  ids are filtered so a bad registry entry can never wedge the workspace. */
 export async function discoverTreasuries(address: string): Promise<string[]> {
   try {
     const res = await makeRegistry(address).treasuries_of({ owner: address });
-    return res.result ?? [];
+    return (res.result ?? []).filter(isValidContractId);
   } catch {
     return [];
   }
