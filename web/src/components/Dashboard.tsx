@@ -6,7 +6,6 @@
 */
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import PrismMark from "./PrismMark";
 import FundingRail from "./FundingRail";
 import {
   readState, readTaskSpent, agentPay, type PrismState, type PayResult,
@@ -16,9 +15,6 @@ import {
   TREASURY_ID, USDC_SAC, AGENT_PK, REG_IDENTITY, AGENT_8004_ID,
   SERVICE, ATTACKER, VERIFIER_ID, ATTESTED_TX, type AgentTask,
 } from "../config";
-
-// preserve the brand mark import (used as the avatar fallback glyph below)
-void PrismMark;
 
 const EASE = [0.2, 0.7, 0.3, 1] as const;
 const up = (delay: number) => ({

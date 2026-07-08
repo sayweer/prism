@@ -1,0 +1,74 @@
+import { describe, it, expect, beforeEach } from "vitest";
+import { Keypair } from "@stellar/stellar-sdk";
+import {
+  clearSessionSecret,
+  loadSessionSecret,
+  saveSessionSecret,
+  sessionIsActive,
+  sessionSigner,
+} from "./session";
+
+beforeEach(() => {
+  const store: Record<string, string> = {};
+  globalThis.localStorage = {
+    getItem: (k: string) => (k in store ? store[k] : null),
+    setItem: (k: string, v: string) => {
+      store[k] = v;
+    },
+    removeItem: (k: string) => {
+      delete store[k];
+    },
+    clear: () => {
+      for (const k in store) delete store[k];
+    },
+    key: () => null,
+    length: 0,
+  } as Storage;
+});
+
+describe("session secret store", () => {
+  it("round-trips a secret per treasury", () => {
+    saveSessionSecret("CT1", "SECRET1");
+    saveSessionSecret("CT2", "SECRET2");
+    expect(loadSessionSecret("CT1")).toBe("SECRET1");
+    expect(loadSessionSecret("CT2")).toBe("SECRET2");
+  });
+
+  it("returns null for an unknown treasury", () => {
+    expect(loadSessionSecret("CNONE")).toBeNull();
+  });
+
+  it("clears only the given treasury's secret", () => {
+    saveSessionSecret("CT1", "S1");
+    saveSessionSecret("CT2", "S2");
+    clearSessionSecret("CT1");
+    expect(loadSessionSecret("CT1")).toBeNull();
+    expect(loadSessionSecret("CT2")).toBe("S2");
+  });
+});
+
+describe("sessionIsActive", () => {
+  const nowMs = 1_000_000_000 * 1000; // fixed clock
+
+  it("is false for no session", () => {
+    expect(sessionIsActive(null, nowMs)).toBe(false);
+  });
+
+  it("is true while valid_until is in the future", () => {
+    expect(sessionIsActive({ valid_until: BigInt(1_000_000_100) }, nowMs)).toBe(true);
+  });
+
+  it("is false at exactly valid_until and after (contract's `<` rule)", () => {
+    expect(sessionIsActive({ valid_until: BigInt(1_000_000_000) }, nowMs)).toBe(false);
+    expect(sessionIsActive({ valid_until: BigInt(999_999_900) }, nowMs)).toBe(false);
+  });
+});
+
+describe("sessionSigner", () => {
+  it("derives the keypair's public key and a signTransaction fn from the secret", () => {
+    const kp = Keypair.random();
+    const { publicKey, signer } = sessionSigner(kp.secret());
+    expect(publicKey).toBe(kp.publicKey());
+    expect(typeof signer.signTransaction).toBe("function");
+  });
+});

@@ -42,6 +42,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # The web app ships its own copies of the generated contract clients; regen via
+      # `npm run generate` in packages/*-client keeps them byte-identical.
+      - name: treasury-client — web copy in sync
+        run: cmp packages/treasury-client/src/index.ts web/src/lib/treasuryClient.ts
+      - name: registry-client — web copy in sync
+        run: cmp packages/registry-client/src/index.ts web/src/lib/registryClient.ts
       - uses: actions/setup-node@v4
         with:
           node-version: 22

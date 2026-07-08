@@ -42,10 +42,44 @@ describe("agentScorecard", () => {
 describe("monitor", () => {
   beforeEach(() => resetMonitor());
 
-  it("tracks errors and violations with the last error message", () => {
-    trackError("boom");
-    trackViolation();
-    trackViolation();
-    expect(getMonitor()).toEqual({ errors: 1, violations: 2, lastError: "boom" });
+  it("tracks errors and violations per treasury with the last error message", () => {
+    trackError("C1", "boom");
+    trackViolation("C1");
+    trackViolation("C1");
+    expect(getMonitor("C1")).toEqual({ errors: 1, violations: 2, lastError: "boom" });
+  });
+
+  it("isolates counters between treasuries", () => {
+    trackViolation("C1");
+    trackError("C2", "x");
+    expect(getMonitor("C1")).toEqual({ errors: 0, violations: 1, lastError: null });
+    expect(getMonitor("C2")).toEqual({ errors: 1, violations: 0, lastError: "x" });
+  });
+
+  it("returns a zeroed snapshot for an untouched treasury", () => {
+    expect(getMonitor("CNONE")).toEqual({ errors: 0, violations: 0, lastError: null });
+  });
+
+  it("resetMonitor(id) clears only that treasury", () => {
+    trackViolation("C1");
+    trackViolation("C2");
+    resetMonitor("C1");
+    expect(getMonitor("C1").violations).toBe(0);
+    expect(getMonitor("C2").violations).toBe(1);
+  });
+
+  it("resetMonitor() with no argument clears all treasuries", () => {
+    trackViolation("C1");
+    trackViolation("C2");
+    resetMonitor();
+    expect(getMonitor("C1").violations).toBe(0);
+    expect(getMonitor("C2").violations).toBe(0);
+  });
+
+  it("getMonitor returns a snapshot, not a live reference", () => {
+    trackViolation("C1");
+    const snap = getMonitor("C1");
+    snap.violations = 99;
+    expect(getMonitor("C1").violations).toBe(1);
   });
 });

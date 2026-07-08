@@ -221,7 +221,7 @@
               "key": {
                 "vec": [
                   {
-                    "symbol": "DaySpent"
+                    "symbol": "HourSpent"
                   },
                   {
                     "u64": "0"

@@ -10,15 +10,19 @@ import {
   StrKey,
   TransactionBuilder,
 } from "@stellar/stellar-sdk";
-import { Client, Errors } from "./treasuryClient";
+import { Client, type Session } from "./treasuryClient";
+import { contractErr, errText } from "./wallet-errors";
 import type { ContractSigner } from "./walletSigner";
 import { NETWORK_PASSPHRASE, RPC_URL } from "../config";
 
 // Native XLM SAC on testnet — the token each user treasury holds and spends.
 export const XLM_SAC = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC";
 // Treasury WASM already installed on-chain — deploy just instantiates a new contract from it.
+// v3.1 (audit hardening: admin_cancel_escrow + deadline validation + escrow TTL +
+// whitelist/rep-gate events), installed 2026-07-07:
+// https://stellar.expert/explorer/testnet/tx/e12e748bdaafa39a08c2bfe56e009fa507f951d93af16455cb7ece019a243b3c
 export const TREASURY_WASM_HASH =
-  "41c8bb1f0b4d9bd7b89c3a855ee87cb56971a256fe110cd2860d406dde040c2b";
+  "7e103d8c177f3b46d4f7ccee695e7c9a92f5d3e5e55b96324173f923db9f9ae7";
 
 const XLM_UNIT = 10_000_000;
 
@@ -50,6 +54,9 @@ export interface PayResult {
   hash?: string;
   errorCode?: number;
   errorMessage?: string;
+  /** true = an infra/concurrency hiccup (stale sequence, RPC busy), NOT a contract
+   *  guardrail rejection — safe to retry. Only the shared-agent demo path sets it. */
+  transient?: boolean;
 }
 
 /** A treasury Client bound to a runtime contract id + the connected wallet as signer. */
@@ -150,28 +157,106 @@ export async function removePayee(treasury: Client, payee: string): Promise<void
   await tx.signAndSend();
 }
 
+/** Build → sign → send a contract tx, mapping on-chain guardrail rejections
+ *  to friendly messages. Shared by every state-changing treasury call. */
+async function sendTx(
+  build: () => Promise<{ signAndSend: () => Promise<unknown> }>,
+  failMsg: string,
+): Promise<PayResult> {
+  try {
+    const tx = await build();
+    const sent = await tx.signAndSend();
+    const hash = (sent as { sendTransactionResponse?: { hash?: string } }).sendTransactionResponse
+      ?.hash;
+    return { ok: true, hash };
+  } catch (e) {
+    const msg = errText(e);
+    const ce = contractErr(msg);
+    if (ce) return { ok: false, ...ce };
+    return { ok: false, errorMessage: msg.slice(0, 160) || failMsg };
+  }
+}
+
 /** Spend from the treasury. The contract enforces the policy and rejects violations
- *  on-chain (#1..#4) — those rejections are the product working, surfaced as messages. */
+ *  on-chain — those rejections are the product working, surfaced as messages. */
 export async function pay(
   treasury: Client,
   taskId: bigint,
   to: string,
   amountXlm: number,
 ): Promise<PayResult> {
+  return sendTx(
+    () => treasury.pay({ task_id: taskId, to, amount: toStroops(amountXlm) }),
+    "Payment failed.",
+  );
+}
+
+// ---- M2 lifecycle ---------------------------------------------------------------
+
+export interface Lifecycle {
+  paused: boolean;
+  session: Session | null;
+}
+
+/** The v3 lifecycle state (pause flag + agent session). Returns null on a pre-M2
+ *  treasury — callers treat null as "legacy: hide the session/lifecycle sections". */
+export async function readLifecycle(treasury: Client): Promise<Lifecycle | null> {
   try {
-    const tx = await treasury.pay({ task_id: taskId, to, amount: toStroops(amountXlm) });
-    const sent = await tx.signAndSend();
-    const hash = (sent as { sendTransactionResponse?: { hash?: string } }).sendTransactionResponse
-      ?.hash;
-    return { ok: true, hash };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : typeof e === "string" ? e : JSON.stringify(e);
-    const m = msg.match(/Error\(Contract,\s*#?(\d+)\)/);
-    if (m) {
-      const code = Number(m[1]);
-      const known = (Errors as Record<number, { message: string }>)[code];
-      return { ok: false, errorCode: code, errorMessage: known?.message ?? `Contract error #${code}` };
-    }
-    return { ok: false, errorMessage: msg.slice(0, 160) || "Payment failed." };
+    const [paused, session] = await Promise.all([treasury.is_paused(), treasury.get_session()]);
+    return { paused: paused.result, session: session.result ?? null };
+  } catch {
+    return null;
   }
+}
+
+/** Freeze/unfreeze spending (owner-signed). Exit paths keep working while paused. */
+export async function setPaused(treasury: Client, paused: boolean): Promise<PayResult> {
+  return sendTx(() => treasury.set_paused({ paused }), "Pause toggle failed.");
+}
+
+/** Owner reclaims free (unlocked) funds — exempt from pause, limits, and the whitelist. */
+export async function adminWithdraw(
+  treasury: Client,
+  to: string,
+  amountXlm: number,
+): Promise<PayResult> {
+  return sendTx(
+    () => treasury.admin_withdraw({ to, amount: toStroops(amountXlm) }),
+    "Withdraw failed.",
+  );
+}
+
+/** Update the spending limits, effective immediately (owner-signed). */
+export async function setLimits(
+  treasury: Client,
+  dailyXlm: number,
+  perTaskXlm: number,
+): Promise<PayResult> {
+  return sendTx(
+    () =>
+      treasury.set_limits({
+        daily_limit: toStroops(dailyXlm),
+        per_task_limit: toStroops(perTaskXlm),
+      }),
+    "Limit update failed.",
+  );
+}
+
+/** Register a session agent (owner-signed). While active it is the treasury's
+ *  ONLY spender — time-bound, spend-capped, instantly revocable. */
+export async function setSession(
+  treasury: Client,
+  agent: string,
+  validUntil: bigint,
+  capXlm: number,
+): Promise<PayResult> {
+  return sendTx(
+    () => treasury.set_session({ agent, valid_until: validUntil, limit: toStroops(capXlm) }),
+    "Session start failed.",
+  );
+}
+
+/** Instantly revoke the session (owner-signed) — spending falls back to the wallet. */
+export async function revokeSession(treasury: Client): Promise<PayResult> {
+  return sendTx(() => treasury.revoke_session(), "Session revoke failed.");
 }

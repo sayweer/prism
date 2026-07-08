@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { rpc } from "@stellar/stellar-sdk";
 import { EXPLORER, RPC_URL, TREASURY_ID, VERIFIER_ID } from "../config";
-import { fetchEventsPage, type FeedEvent } from "../lib/events";
+import { dedupeById, fetchAllEvents, fetchEventsPage, type FeedEvent } from "../lib/events";
 import { getAddress } from "../lib/walletKit";
 import { getTreasuryId } from "../lib/treasuryStore";
 
@@ -34,7 +34,7 @@ export default function ActivityFeed() {
       try {
         const page = await fetchEventsPage(server, cursor ? { cursor, contractIds } : ({ contractIds } as never));
         if (page.events.length) {
-          setEvents((prev) => dedupe([...page.events.reverse(), ...prev]).slice(0, MAX_ITEMS));
+          setEvents((prev) => dedupeById([...page.events.reverse(), ...prev]).slice(0, MAX_ITEMS));
         }
         if (page.cursor) cursor = page.cursor;
       } catch {
@@ -48,16 +48,11 @@ export default function ActivityFeed() {
         const latest = await server.getLatestLedger();
         const start = Math.max(1, latest.sequence - 17280); // ~last day of activity (5s ledgers)
         // getEvents scans ~10k ledgers per call, so a day-wide window spans multiple
-        // pages — page through to the head up front, or the newest events (past the
-        // first, often empty, page) never render and the feed looks dead.
-        let page = await fetchEventsPage(server, { startLedger: start, contractIds });
-        let all = page.events;
-        for (let i = 0; i < 3 && page.cursor; i++) {
-          page = await fetchEventsPage(server, { cursor: page.cursor, contractIds });
-          all = [...all, ...page.events];
-        }
-        setEvents(dedupe(all.reverse()).slice(0, MAX_ITEMS));
-        cursor = page.cursor;
+        // pages — page through to the head up front (head-based stop), or the newest
+        // events (past the first, often empty, page) never render and the feed looks dead.
+        const { events: all, cursor: c } = await fetchAllEvents(server, { startLedger: start, contractIds });
+        setEvents(dedupeById(all.reverse()).slice(0, MAX_ITEMS));
+        cursor = c;
         setState("live");
         timer = setTimeout(tick, POLL_MS);
       } catch {
@@ -109,11 +104,6 @@ export default function ActivityFeed() {
       </div>
     </div>
   );
-}
-
-function dedupe(list: FeedEvent[]): FeedEvent[] {
-  const seen = new Set<string>();
-  return list.filter((e) => (seen.has(e.id) ? false : seen.add(e.id)));
 }
 
 function timeAgo(iso: string): string {

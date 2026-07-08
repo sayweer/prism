@@ -2,8 +2,8 @@ import type { CSSProperties } from "react";
 
 // Feedback funnels to ONE channel — the Google Form (name + email + wallet + rating) — so
 // every response lands in a single sheet (risein Level 5 evidence) instead of splitting
-// between Supabase and the form. The in-app Supabase modal (FeedbackModal / lib/feedback) is
-// retired; the existing Supabase rows are kept as early feedback.
+// between Supabase and the form. The in-app Supabase modal was retired and removed;
+// the existing Supabase `feedback` rows are kept as early feedback.
 const FEEDBACK_FORM_URL = "https://forms.gle/7gzJWwte52SmbXei7";
 
 export default function FeedbackButton() {

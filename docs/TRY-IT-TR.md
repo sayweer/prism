@@ -28,12 +28,20 @@ Her adım cüzdanınızla imzalanır — non-custodial, fonlar hep sizin kontrol
 8. **Asıl gösteriyi izle** — şimdi bir de limit ÜSTÜ tutar dene, ya da whitelist dışı bir
    adrese göndermeyi dene: kontrat işlemi **on-chain reddeder**, para yerinden oynamaz.
    Bu red, ürünün ta kendisi. 🔴
+9. **Hazineyi ajana devret (popup'lar bitsin)** — **Agent session** bölümünde harcama
+   tavanı ve süre belirle → *Start agent session* (tek cüzdan onayı). Artık ödemeler
+   session anahtarıyla imzalanır — **Run autonomous task**'a bas: 1 XLM, **sıfır cüzdan
+   popup'ıyla** on-chain işler ve tüm limitler yine geçerlidir. *Revoke session* ile
+   kontrolü anında geri alırsın.
+10. **Sahip kontrolleri** — **Controls** bölümünde *Pause spending* (ajanı dondurur,
+    withdraw çalışmaya devam eder), *Withdraw* ile paranı geri çek, *Update limits* ile
+    limitleri anında güncelle — sahibin her zaman bir çıkışı var.
 
 ## Bir şey ters giderse
 
 - Hata mesajları uygulama içinde açıklamalı gösterilir (bakiye yetersiz, imza reddedildi vb.).
-- Sağ alttaki **Share feedback** butonundan iki cümlelik geri bildirim bırakırsan
-  yol haritasını doğrudan şekillendirirsin. 🙏
+- Sağ alttaki **Share feedback** butonu kısa bir Google Form açar — iki cümlelik geri
+  bildirim yol haritasını doğrudan şekillendirir. 🙏
 
 ## Daha fazlası
 

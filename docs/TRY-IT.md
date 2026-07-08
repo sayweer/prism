@@ -31,13 +31,21 @@ by your own wallet — non-custodial, funds stay under your control the whole ti
 8. **Now watch the real show** — try an amount **over** your limit, or a payment to an
    address you never whitelisted: the contract **rejects it on-chain** and funds never
    move. That rejection is the product working. 🔴
+9. **Hand it to an agent (no more popups)** — in **Agent session**, set a spending cap
+   and a duration → *Start agent session* (one wallet approval). From then on payments
+   sign with the session key — try **Run autonomous task**: 1 XLM settles on-chain with
+   **zero wallet popups**, and every limit still applies. *Revoke session* takes control
+   back instantly.
+10. **Owner controls** — in **Controls** you can *Pause spending* (freezes the agent,
+    withdraw still works), *Withdraw* your funds back out, and *Update limits* on the
+    fly — the owner always has an exit.
 
 ## If something goes wrong
 
 - Errors are shown in plain language inside the app (insufficient balance, signature
   rejected, and so on).
-- Two sentences via the **Share feedback** button (bottom right) directly shape the
-  roadmap. 🙏
+- The **Share feedback** button (bottom right) opens a short Google Form — two sentences
+  there directly shape the roadmap. 🙏
 
 ## More
 

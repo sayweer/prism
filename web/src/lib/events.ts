@@ -54,12 +54,14 @@ export function formatEvent(topics: unknown[], data: unknown): { kind: string; l
  *  treasury (defaults to the demo treasury + verifier), plus either startLedger or a cursor. */
 export async function fetchEventsPage(
   server: rpc.Server,
-  opts?: { contractIds?: string[]; startLedger?: number; cursor?: string },
-): Promise<{ events: FeedEvent[]; cursor: string }> {
+  opts?: { contractIds?: string[]; startLedger?: number; cursor?: string; limit?: number },
+): Promise<{ events: FeedEvent[]; cursor: string; latestLedger: number }> {
   const o = opts ?? {};
   const filters = [{ type: "contract" as const, contractIds: o.contractIds ?? WATCHED }];
   const res = await server.getEvents(
-    o.cursor ? { cursor: o.cursor, filters } : { startLedger: o.startLedger ?? 0, filters },
+    o.cursor
+      ? { cursor: o.cursor, filters, limit: o.limit }
+      : { startLedger: o.startLedger ?? 0, filters, limit: o.limit },
   );
 
   const events = res.events.map((e): FeedEvent => {
@@ -70,5 +72,65 @@ export async function fetchEventsPage(
     const amountXlm = kind === "paid" ? Number(d?.[1]) / 1e7 : undefined;
     return { id: e.id, kind, label, txHash: e.txHash, at: e.ledgerClosedAt, amountXlm };
   });
-  return { events, cursor: (res as { cursor?: string }).cursor ?? "" };
+  return {
+    events,
+    cursor: (res as { cursor?: string }).cursor ?? "",
+    latestLedger: (res as { latestLedger?: number }).latestLedger ?? 0,
+  };
+}
+
+/** The ledger a getEvents paging cursor points at (the TOID's high 32 bits).
+ *  Returns 0 when the cursor is empty/unparsable — callers then fall back to the
+ *  maxPages guard, so a format change can never loop forever. */
+export function cursorLedger(cursor: string): number {
+  const toid = cursor.split("-")[0];
+  if (!toid || !/^\d+$/.test(toid)) return 0;
+  return Number(BigInt(toid) >> 32n);
+}
+
+/** Drop duplicate event ids, keeping each id's first occurrence. */
+export function dedupeById(list: FeedEvent[]): FeedEvent[] {
+  const seen = new Set<string>();
+  return list.filter((e) => (seen.has(e.id) ? false : seen.add(e.id)));
+}
+
+/** Page from the fetcher's starting point all the way to the chain head. Termination is
+ *  head-based (cursor ledger vs latestLedger), NOT events-length-based: an empty page can
+ *  just be a quiet scan window, and the RPC returns a cursor even at head. The newest
+ *  events are therefore never silently dropped; `truncated` reports the rare case where
+ *  the maxPages guard tripped before reaching head (history incomplete at the OLD end
+ *  of what was read — the caller should surface, not ignore, partial totals). */
+export async function pageToHead(
+  fetchPage: (
+    cursor?: string,
+  ) => Promise<{ events: FeedEvent[]; cursor: string; latestLedger: number }>,
+  maxPages = 50,
+): Promise<{ events: FeedEvent[]; cursor: string; truncated: boolean }> {
+  let page = await fetchPage();
+  let events = page.events;
+  let pages = 1;
+  const behindHead = () =>
+    Boolean(page.cursor) && page.latestLedger > 0 && cursorLedger(page.cursor) <= page.latestLedger;
+  while (pages < maxPages && behindHead()) {
+    page = await fetchPage(page.cursor);
+    events = [...events, ...page.events];
+    pages++;
+  }
+  return { events, cursor: page.cursor, truncated: behindHead() };
+}
+
+/** getEvents from `startLedger` (or an incremental `cursor`) up to the chain head. */
+export async function fetchAllEvents(
+  server: rpc.Server,
+  opts: { contractIds: string[]; startLedger?: number; cursor?: string },
+): Promise<{ events: FeedEvent[]; cursor: string; truncated: boolean }> {
+  return pageToHead((c) => {
+    const cursor = c ?? opts.cursor;
+    return fetchEventsPage(
+      server,
+      cursor
+        ? { cursor, contractIds: opts.contractIds, limit: 1000 }
+        : { startLedger: opts.startLedger, contractIds: opts.contractIds, limit: 1000 },
+    );
+  });
 }

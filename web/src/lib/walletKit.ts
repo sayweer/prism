@@ -78,8 +78,27 @@ StellarWalletsKit.setTheme({
 export { StellarWalletsKit as kit };
 
 const ADDR_KEY = "prism_wallet_address";
+const WALLET_ID_KEY = "prism_wallet_id";
 let connectedAddress: string | null =
   typeof sessionStorage !== "undefined" ? sessionStorage.getItem(ADDR_KEY) : null;
+
+// Reload persistence for the SELECTED MODULE, not just the address: the kit routes
+// `signTransaction` through its selected module, and `init` above resets that selection
+// to Freighter on every page load. Without restoring it, a reconnected xBull / Lobstr /
+// WalletConnect session would look connected (address survives) but sign through the
+// wrong wallet. Restore is best-effort — an unavailable module (e.g. the WalletConnect
+// env var was removed) just leaves the Freighter default.
+const savedWalletId =
+  typeof sessionStorage !== "undefined" ? sessionStorage.getItem(WALLET_ID_KEY) : null;
+if (savedWalletId && savedWalletId !== FREIGHTER_ID && connectedAddress) {
+  (async () => {
+    try {
+      await StellarWalletsKit.setWallet(savedWalletId);
+    } catch {
+      /* module unavailable — Freighter default stands */
+    }
+  })();
+}
 
 // The nav chip and the views all reflect one connection — notify them on change.
 type AddressListener = (address: string | null) => void;
@@ -114,12 +133,10 @@ export async function connect(): Promise<string> {
     if (address) {
       connectedAddress = address;
       sessionStorage.setItem(ADDR_KEY, address);
+      const walletId = (res as { walletId?: string }).walletId;
+      if (walletId) sessionStorage.setItem(WALLET_ID_KEY, walletId); // survive reloads (see above)
       notifyAddress();
-      logFunnel({
-        event: "connect_result",
-        outcome: "success",
-        walletId: (res as { walletId?: string }).walletId,
-      });
+      logFunnel({ event: "connect_result", outcome: "success", walletId });
       return address;
     }
   } catch (e) {
@@ -142,6 +159,7 @@ export async function disconnect(): Promise<void> {
   }
   connectedAddress = null;
   sessionStorage.removeItem(ADDR_KEY);
+  sessionStorage.removeItem(WALLET_ID_KEY);
   notifyAddress();
 }
 

@@ -1,16 +1,19 @@
 // Analytics + monitoring panel for the connected treasury: payment count, total spent,
 // policy violations, runtime errors, and a small spend sparkline — derived from the
 // treasury's on-chain `paid` events + the client-side monitor.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { rpc } from "@stellar/stellar-sdk";
 import { RPC_URL } from "../config";
-import { fetchEventsPage, type FeedEvent } from "../lib/events";
+import { dedupeById, fetchAllEvents, type FeedEvent } from "../lib/events";
 import { agentScorecard, getMonitor, spendSeries } from "../lib/analytics";
 
 export default function Analytics({ contractId, refreshKey = 0 }: { contractId: string; refreshKey?: number }) {
   const [events, setEvents] = useState<FeedEvent[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [tick, setTick] = useState(0);
+  // Last read's paging cursor + events, so a refresh continues from where the previous
+  // read stopped (typically one RPC round-trip) instead of re-scanning all history.
+  const cacheRef = useRef<{ contractId: string; cursor: string; events: FeedEvent[] } | null>(null);
 
   // Re-fetch on contract change, after a parent action (refreshKey), or manual ↻ (tick).
   // RPC indexes a new payment a few seconds after it lands, so the manual refresh covers
@@ -19,11 +22,31 @@ export default function Analytics({ contractId, refreshKey = 0 }: { contractId: 
     let alive = true;
     setState("loading");
     (async () => {
+      const server = new rpc.Server(RPC_URL);
+
+      // Incremental: continue from the cached cursor.
+      const cached = cacheRef.current;
+      if (cached?.contractId === contractId && cached.cursor) {
+        try {
+          const page = await fetchAllEvents(server, { contractIds: [contractId], cursor: cached.cursor });
+          const merged = dedupeById([...cached.events, ...page.events]);
+          cacheRef.current = { contractId, cursor: page.cursor || cached.cursor, events: merged };
+          if (page.truncated) console.warn("Analytics: event history truncated at the page cap — totals may be partial.");
+          if (alive) {
+            setEvents(merged);
+            setState("ready");
+          }
+          return;
+        } catch {
+          cacheRef.current = null; // stale/expired cursor — fall back to a cold load
+        }
+      }
+
       try {
-        const server = new rpc.Server(RPC_URL);
-        // Read the treasury's WHOLE retained history, not a half-day window — otherwise a
-        // user returning a day later sees zeroed analytics. getEvents scans ~10k ledgers
-        // per call, so start at the RPC's oldest retained ledger and page to the head.
+        // Cold load: the treasury's WHOLE retained history, not a half-day window —
+        // otherwise a user returning a day later sees zeroed analytics. Start at the
+        // RPC's oldest retained ledger and page to the chain head (head-based stop,
+        // so the NEWEST events are never dropped).
         let start = 1;
         try {
           const health = await server.getHealth();
@@ -32,14 +55,11 @@ export default function Analytics({ contractId, refreshKey = 0 }: { contractId: 
           const latest = await server.getLatestLedger();
           start = Math.max(1, latest.sequence - 9000);
         }
-        let page = await fetchEventsPage(server, { contractIds: [contractId], startLedger: start });
-        let all = page.events;
-        for (let i = 0; i < 15 && page.cursor; i++) {
-          page = await fetchEventsPage(server, { cursor: page.cursor, contractIds: [contractId] });
-          all = [...all, ...page.events];
-        }
+        const page = await fetchAllEvents(server, { contractIds: [contractId], startLedger: start });
+        cacheRef.current = { contractId, cursor: page.cursor, events: page.events };
+        if (page.truncated) console.warn("Analytics: event history truncated at the page cap — totals may be partial.");
         if (alive) {
-          setEvents(all);
+          setEvents(page.events);
           setState("ready");
         }
       } catch {
@@ -53,7 +73,7 @@ export default function Analytics({ contractId, refreshKey = 0 }: { contractId: 
 
   const score = agentScorecard(events);
   const series = spendSeries(events);
-  const monitor = getMonitor();
+  const monitor = getMonitor(contractId);
   const max = Math.max(1, ...series.map((p) => p.xlm));
 
   return (

@@ -4,12 +4,12 @@
 //! A non-custodial treasury that lets a business delegate spending to an AI agent
 //! while the *contract* — not the model's good behaviour — enforces hard limits.
 //! Every payment is checked against a policy (payee whitelist, per-task limit,
-//! daily limit) and rejected on-chain if it violates the policy. Spend is
+//! rolling 24h limit) and rejected on-chain if it violates the policy. Spend is
 //! accounted per task so each agent payment is automatically attributable.
 
 use soroban_sdk::{
-    contract, contractclient, contracterror, contractimpl, contracttype, symbol_short, token,
-    Address, Env,
+    contract, contractclient, contracterror, contractimpl, contracttype, panic_with_error,
+    symbol_short, token, Address, Env,
 };
 
 #[contracterror]
@@ -24,6 +24,10 @@ pub enum Error {
     InsufficientFreeBalance = 6,
     EscrowNotFound = 7,
     DeadlineNotReached = 8,
+    Paused = 9,
+    ExceedsSessionLimit = 10,
+    InvalidLimits = 11,
+    InvalidDeadline = 12,
 }
 
 #[contracttype]
@@ -31,14 +35,27 @@ pub enum Error {
 pub struct Config {
     /// Owner of the funds; the only one who can change the policy.
     pub admin: Address,
-    /// The agent allowed to trigger payments (must sign each `pay`).
+    /// The root agent allowed to trigger payments when no session is active.
     pub agent: Address,
     /// SEP-41 / SAC token the treasury holds and spends (e.g. USDC).
     pub token: Address,
-    /// Max total spend allowed per UTC calendar day (resets at 00:00 UTC).
+    /// Max total spend allowed inside any rolling 24-hour window.
     pub daily_limit: i128,
     /// Max spend allowed in a single payment.
     pub per_task_limit: i128,
+}
+
+/// A time-bound, spend-capped agent credential. While a session is active
+/// (`now < valid_until`) it is the ONLY spender — the root agent is replaced,
+/// not complemented, so authorisation stays unambiguous and auditable. When it
+/// expires or is revoked, spending falls back to `Config.agent`.
+#[contracttype]
+#[derive(Clone)]
+pub struct Session {
+    pub agent: Address,
+    pub valid_until: u64,
+    pub limit: i128,
+    pub spent: i128,
 }
 
 /// An outcome-bound payment: `amount` is reserved (locked) in the treasury for
@@ -58,13 +75,18 @@ pub struct Escrow {
 pub enum DataKey {
     Config,
     Payee(Address),
-    DaySpent(u64),
+    /// Spend bucketed per hour (`timestamp / 3600`) — the rolling 24h window sums
+    /// the last 24 buckets. Old buckets are simply never read again; persistent
+    /// min-TTL far exceeds 24h, so an in-window bucket can never be archived.
+    HourSpent(u64),
     TaskSpent(u64),
     RepRegistry,
     MinReputation,
     EscrowEntry(u64),
     NextEscrowId,
     Locked,
+    Session,
+    Paused,
 }
 
 /// Minimal reputation-oracle interface PRISM reads to authorize a *non-whitelisted*
@@ -76,7 +98,14 @@ pub trait ReputationOracle {
     fn reputation_of(env: Env, agent: Address) -> i128;
 }
 
+const SECONDS_PER_HOUR: u64 = 3_600;
+const WINDOW_HOURS: u64 = 24;
 const SECONDS_PER_DAY: u64 = 86_400;
+// Ledgers close ~every 5s. Escrow entries get their TTL extended past the deadline so a
+// far-future escrow can never be archived while `Locked` still counts it (which would
+// strand the funds: unreadable entry, permanently inflated lock).
+const LEDGERS_PER_WEEK: u32 = 120_960;
+const MAX_TTL_LEDGERS: u32 = 3_110_400; // ≈ 6 months of 5s ledgers (order of the network cap)
 
 #[contract]
 pub struct Treasury;
@@ -84,6 +113,8 @@ pub struct Treasury;
 #[contractimpl]
 impl Treasury {
     /// Atomic init at deploy time (no front-runnable `initialize`).
+    /// Limits are validated here so a treasury can never exist with a policy
+    /// that contradicts itself (e.g. per-task above daily).
     pub fn __constructor(
         env: Env,
         admin: Address,
@@ -92,6 +123,9 @@ impl Treasury {
         daily_limit: i128,
         per_task_limit: i128,
     ) {
+        if daily_limit <= 0 || per_task_limit <= 0 || per_task_limit > daily_limit {
+            panic_with_error!(&env, Error::InvalidLimits);
+        }
         let cfg = Config {
             admin,
             agent,
@@ -106,14 +140,20 @@ impl Treasury {
     pub fn add_payee(env: Env, payee: Address) {
         let cfg = Self::cfg(&env);
         cfg.admin.require_auth();
-        env.storage().persistent().set(&DataKey::Payee(payee), &true);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Payee(payee.clone()), &true);
+        env.events().publish((symbol_short!("payee_add"),), payee);
     }
 
     /// Remove a payee from the whitelist. Admin-only.
     pub fn remove_payee(env: Env, payee: Address) {
         let cfg = Self::cfg(&env);
         cfg.admin.require_auth();
-        env.storage().persistent().remove(&DataKey::Payee(payee));
+        env.storage()
+            .persistent()
+            .remove(&DataKey::Payee(payee.clone()));
+        env.events().publish((symbol_short!("payee_rm"),), payee);
     }
 
     /// Set (or update) the reputation gate. Admin-only. With `min_reputation > 0`,
@@ -123,10 +163,14 @@ impl Treasury {
     pub fn set_reputation_policy(env: Env, registry: Address, min_reputation: i128) {
         let cfg = Self::cfg(&env);
         cfg.admin.require_auth();
-        env.storage().instance().set(&DataKey::RepRegistry, &registry);
+        env.storage()
+            .instance()
+            .set(&DataKey::RepRegistry, &registry);
         env.storage()
             .instance()
             .set(&DataKey::MinReputation, &min_reputation);
+        env.events()
+            .publish((symbol_short!("rep_gate"),), (registry, min_reputation));
     }
 
     /// The active reputation gate, if any: `(registry, min_reputation)`.
@@ -140,11 +184,127 @@ impl Treasury {
         registry.map(|r| (r, min))
     }
 
+    // ---- session: time-bound, spend-capped agent credential ------------------
+
+    /// Delegate spending to a session agent. Admin-only. While the session is
+    /// active it is the only spender (see `Session`); setting a new session
+    /// overwrites the old one and resets its spent counter (rotation).
+    pub fn set_session(
+        env: Env,
+        agent: Address,
+        valid_until: u64,
+        limit: i128,
+    ) -> Result<(), Error> {
+        let cfg = Self::cfg(&env);
+        cfg.admin.require_auth();
+        if limit <= 0 || valid_until <= env.ledger().timestamp() {
+            return Err(Error::InvalidLimits);
+        }
+        let session = Session {
+            agent: agent.clone(),
+            valid_until,
+            limit,
+            spent: 0,
+        };
+        env.storage().instance().set(&DataKey::Session, &session);
+        env.events()
+            .publish((symbol_short!("session"),), (agent, valid_until, limit));
+        Ok(())
+    }
+
+    /// Instantly revoke the session — spending falls back to the root agent.
+    /// Admin-only; deliberately works while paused (incident response).
+    pub fn revoke_session(env: Env) {
+        let cfg = Self::cfg(&env);
+        cfg.admin.require_auth();
+        env.storage().instance().remove(&DataKey::Session);
+        env.events().publish((symbol_short!("revoked"),), ());
+    }
+
+    /// The stored session, if any — including an expired one (callers compare
+    /// `valid_until` to now; the contract itself ignores expired sessions).
+    pub fn get_session(env: Env) -> Option<Session> {
+        env.storage().instance().get(&DataKey::Session)
+    }
+
+    // ---- lifecycle -----------------------------------------------------------
+
+    /// Freeze/unfreeze spending (pay, create_escrow, release_escrow). Admin-only.
+    /// Exit paths — refund_escrow, admin_withdraw, and every admin setter — keep
+    /// working while paused, so an incident can always be unwound.
+    pub fn set_paused(env: Env, paused: bool) {
+        let cfg = Self::cfg(&env);
+        cfg.admin.require_auth();
+        env.storage().instance().set(&DataKey::Paused, &paused);
+        env.events().publish((symbol_short!("paused"),), paused);
+    }
+
+    pub fn is_paused(env: Env) -> bool {
+        env.storage().instance().get(&DataKey::Paused).unwrap_or(false)
+    }
+
+    /// Owner reclaims free (unlocked) funds with their own signature. Deliberately
+    /// exempt from pause, the payee gate, and the rolling window: those bound
+    /// *delegated* agent spending, and the exit path must work exactly when limits
+    /// are exhausted or spending is frozen. Escrow-locked funds stay locked (the
+    /// commitment to payees survives; refund is the escape hatch for those).
+    pub fn admin_withdraw(env: Env, to: Address, amount: i128) -> Result<(), Error> {
+        let cfg = Self::cfg(&env);
+        cfg.admin.require_auth();
+        if amount <= 0 {
+            return Err(Error::InvalidAmount);
+        }
+        let locked = Self::locked(env.clone());
+        if Self::balance(env.clone()) - locked < amount {
+            return Err(Error::InsufficientFreeBalance);
+        }
+        token::TokenClient::new(&env, &cfg.token).transfer(
+            &env.current_contract_address(),
+            &to,
+            &amount,
+        );
+        env.events()
+            .publish((symbol_short!("withdrawn"),), (to, amount));
+        Ok(())
+    }
+
+    /// Update the spending limits, effective immediately. Admin-only. If the new
+    /// daily limit is below what the window already holds, spending resumes once
+    /// the window drains — that is the intended behaviour.
+    pub fn set_limits(env: Env, daily_limit: i128, per_task_limit: i128) -> Result<(), Error> {
+        let mut cfg = Self::cfg(&env);
+        cfg.admin.require_auth();
+        if daily_limit <= 0 || per_task_limit <= 0 || per_task_limit > daily_limit {
+            return Err(Error::InvalidLimits);
+        }
+        cfg.daily_limit = daily_limit;
+        cfg.per_task_limit = per_task_limit;
+        env.storage().instance().set(&DataKey::Config, &cfg);
+        env.events()
+            .publish((symbol_short!("limits"),), (daily_limit, per_task_limit));
+        Ok(())
+    }
+
+    /// Rotate the root agent (the fallback spender when no session is active).
+    /// Admin-only — the recovery path if the root agent key is lost or leaked.
+    pub fn set_agent(env: Env, agent: Address) {
+        let mut cfg = Self::cfg(&env);
+        cfg.admin.require_auth();
+        cfg.agent = agent.clone();
+        env.storage().instance().set(&DataKey::Config, &cfg);
+        env.events().publish((symbol_short!("agent"),), agent);
+    }
+
+    // ---- spending ------------------------------------------------------------
+
     /// The agent asks the treasury to pay `amount` to `to` for `task_id`.
     /// The contract enforces the policy and rejects any violation on-chain.
+    /// Only the free (unlocked) balance is spendable — funds reserved by open
+    /// escrows cannot be paid out directly.
     pub fn pay(env: Env, task_id: u64, to: Address, amount: i128) -> Result<(), Error> {
         let cfg = Self::cfg(&env);
-        cfg.agent.require_auth();
+        Self::spender(&env, &cfg).require_auth();
+        Self::require_not_paused(&env)?;
 
         if amount <= 0 {
             return Err(Error::InvalidAmount);
@@ -157,22 +317,33 @@ impl Treasury {
         if amount > cfg.per_task_limit {
             return Err(Error::ExceedsTaskLimit);
         }
-        let day = env.ledger().timestamp() / SECONDS_PER_DAY;
-        let spent_today = Self::day_spent_on(&env, day);
-        if spent_today + amount > cfg.daily_limit {
+        let session = Self::active_session(&env);
+        if let Some(ref s) = session {
+            if s.spent + amount > s.limit {
+                return Err(Error::ExceedsSessionLimit);
+            }
+        }
+        let spent_window = Self::rolling_spent(&env);
+        if spent_window + amount > cfg.daily_limit {
             return Err(Error::ExceedsDailyLimit);
+        }
+        let locked = Self::locked(env.clone());
+        if Self::balance(env.clone()) - locked < amount {
+            return Err(Error::InsufficientFreeBalance);
         }
         // ---------------------------------------------------------------------
 
         // ---- EFFECTS: record the spend BEFORE moving funds (checks-effects-interactions).
-        // per-day enforces the daily limit; per-task is the attribution ledger.
+        // per-hour buckets enforce the rolling window; per-task is the attribution ledger.
+        Self::record_window_spend(&env, amount);
         let task_spent = Self::task_spent(env.clone(), task_id);
         env.storage()
             .persistent()
-            .set(&DataKey::DaySpent(day), &(spent_today + amount));
-        env.storage()
-            .persistent()
             .set(&DataKey::TaskSpent(task_id), &(task_spent + amount));
+        if let Some(mut s) = session {
+            s.spent += amount;
+            env.storage().instance().set(&DataKey::Session, &s);
+        }
 
         // ---- INTERACTION: move the treasury's own balance out last. If the transfer
         // panics, the whole tx reverts and the accounting above is rolled back atomically.
@@ -207,9 +378,9 @@ impl Treasury {
             .unwrap_or(0)
     }
 
+    /// Spend inside the rolling 24-hour window (the "daily" allowance).
     pub fn day_spent(env: Env) -> i128 {
-        let day = env.ledger().timestamp() / SECONDS_PER_DAY;
-        Self::day_spent_on(&env, day)
+        Self::rolling_spent(&env)
     }
 
     pub fn balance(env: Env) -> i128 {
@@ -221,8 +392,8 @@ impl Treasury {
 
     /// Agent reserves `amount` for `payee` against a future-delivered task. The funds
     /// stay in the treasury (locked, not transferred) until released on approval or
-    /// refunded after `deadline`. Subject to the same payee gate + per-task limit as
-    /// a direct payment; the daily limit is enforced later, at release.
+    /// refunded after `deadline`. Subject to the same payee gate + per-task limit +
+    /// session cap as a direct payment; the rolling window is enforced at release.
     pub fn create_escrow(
         env: Env,
         task_id: u64,
@@ -231,14 +402,27 @@ impl Treasury {
         deadline: u64,
     ) -> Result<u64, Error> {
         let cfg = Self::cfg(&env);
-        cfg.agent.require_auth();
+        Self::spender(&env, &cfg).require_auth();
+        Self::require_not_paused(&env)?;
 
         if amount <= 0 {
             return Err(Error::InvalidAmount);
         }
+        let now = env.ledger().timestamp();
+        if deadline <= now {
+            return Err(Error::InvalidDeadline);
+        }
         Self::payee_allowed(&env, &payee)?;
         if amount > cfg.per_task_limit {
             return Err(Error::ExceedsTaskLimit);
+        }
+        // The session cap charges at commitment time — it bounds what a leaked
+        // session key can commit, not just what has already left the treasury.
+        let session = Self::active_session(&env);
+        if let Some(ref s) = session {
+            if s.spent + amount > s.limit {
+                return Err(Error::ExceedsSessionLimit);
+            }
         }
         let locked = Self::locked(env.clone());
         if Self::balance(env.clone()) - locked < amount {
@@ -259,8 +443,18 @@ impl Treasury {
         env.storage()
             .persistent()
             .set(&DataKey::EscrowEntry(id), &escrow);
+        // Keep the entry alive comfortably past its deadline (see TTL constants above) —
+        // otherwise `Locked` (instance) could outlive an archived entry and strand funds.
+        let ttl = (((deadline - now) / 5) + LEDGERS_PER_WEEK as u64).min(MAX_TTL_LEDGERS as u64) as u32;
+        env.storage()
+            .persistent()
+            .extend_ttl(&DataKey::EscrowEntry(id), ttl, ttl);
         env.storage().instance().set(&DataKey::NextEscrowId, &(id + 1));
         env.storage().instance().set(&DataKey::Locked, &(locked + amount));
+        if let Some(mut s) = session {
+            s.spent += amount;
+            env.storage().instance().set(&DataKey::Session, &s);
+        }
 
         env.events()
             .publish((symbol_short!("escrowed"), id), (payee, amount));
@@ -268,29 +462,27 @@ impl Treasury {
     }
 
     /// Admin (the owner / hirer) approves delivery → release the locked funds to the
-    /// payee. The daily limit is enforced here, at the real moment of outflow, and
+    /// payee. The rolling window is enforced here, at the real moment of outflow, and
     /// the spend is accounted per task exactly like a direct `pay`.
     pub fn release_escrow(env: Env, id: u64) -> Result<(), Error> {
         let cfg = Self::cfg(&env);
         cfg.admin.require_auth();
+        Self::require_not_paused(&env)?;
         let escrow: Escrow = env
             .storage()
             .persistent()
             .get(&DataKey::EscrowEntry(id))
             .ok_or(Error::EscrowNotFound)?;
 
-        let day = env.ledger().timestamp() / SECONDS_PER_DAY;
-        let spent_today = Self::day_spent_on(&env, day);
-        if spent_today + escrow.amount > cfg.daily_limit {
+        let spent_window = Self::rolling_spent(&env);
+        if spent_window + escrow.amount > cfg.daily_limit {
             return Err(Error::ExceedsDailyLimit);
         }
 
         // EFFECTS before INTERACTION (checks-effects-interactions): record spend,
         // drop the escrow, and release the lock, then move funds out last.
+        Self::record_window_spend(&env, escrow.amount);
         let task_spent = Self::task_spent(env.clone(), escrow.task_id);
-        env.storage()
-            .persistent()
-            .set(&DataKey::DaySpent(day), &(spent_today + escrow.amount));
         env.storage()
             .persistent()
             .set(&DataKey::TaskSpent(escrow.task_id), &(task_spent + escrow.amount));
@@ -310,10 +502,12 @@ impl Treasury {
     }
 
     /// After the deadline, the agent reclaims an undelivered escrow — the lock is
-    /// released back to the treasury's free balance. No transfer, no spend recorded.
+    /// released back to the treasury's free balance. No transfer, no spend recorded,
+    /// and the session budget is NOT restored (conservative: the cap bounds what a
+    /// session may commit). Deliberately works while paused (exit path).
     pub fn refund_escrow(env: Env, id: u64) -> Result<(), Error> {
         let cfg = Self::cfg(&env);
-        cfg.agent.require_auth();
+        Self::spender(&env, &cfg).require_auth();
         let escrow: Escrow = env
             .storage()
             .persistent()
@@ -333,6 +527,30 @@ impl Treasury {
         Ok(())
     }
 
+    /// Admin unilaterally cancels an open escrow — the lock returns to the free
+    /// balance, nothing is paid, no deadline needed. This is the incident-response
+    /// path: a compromised agent could otherwise tie up the whole treasury in
+    /// escrows it alone can refund. Deliberately works while paused (exit path);
+    /// the session budget is NOT restored (consistent with refund).
+    pub fn admin_cancel_escrow(env: Env, id: u64) -> Result<(), Error> {
+        let cfg = Self::cfg(&env);
+        cfg.admin.require_auth();
+        let escrow: Escrow = env
+            .storage()
+            .persistent()
+            .get(&DataKey::EscrowEntry(id))
+            .ok_or(Error::EscrowNotFound)?;
+
+        env.storage().persistent().remove(&DataKey::EscrowEntry(id));
+        env.storage()
+            .instance()
+            .set(&DataKey::Locked, &(Self::locked(env.clone()) - escrow.amount));
+
+        env.events()
+            .publish((symbol_short!("cancelled"), id), (escrow.payee, escrow.amount));
+        Ok(())
+    }
+
     pub fn get_escrow(env: Env, id: u64) -> Option<Escrow> {
         env.storage().persistent().get(&DataKey::EscrowEntry(id))
     }
@@ -348,6 +566,63 @@ impl Treasury {
 impl Treasury {
     fn cfg(env: &Env) -> Config {
         env.storage().instance().get(&DataKey::Config).unwrap()
+    }
+
+    /// The session, only while it is actually active (`now < valid_until`).
+    fn active_session(env: &Env) -> Option<Session> {
+        let s: Option<Session> = env.storage().instance().get(&DataKey::Session);
+        match s {
+            Some(sess) if env.ledger().timestamp() < sess.valid_until => Some(sess),
+            _ => None,
+        }
+    }
+
+    /// Who may spend right now: the active session agent, else the root agent.
+    fn spender(env: &Env, cfg: &Config) -> Address {
+        match Self::active_session(env) {
+            Some(s) => s.agent,
+            None => cfg.agent.clone(),
+        }
+    }
+
+    fn require_not_paused(env: &Env) -> Result<(), Error> {
+        if Self::is_paused(env.clone()) {
+            Err(Error::Paused)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Sum of the last 24 hourly buckets — the rolling window. ~24 persistent
+    /// reads per spend; fits comfortably inside the per-tx entry limits (verified
+    /// live), and a bucket inside the window can never be archived (see DataKey).
+    fn rolling_spent(env: &Env) -> i128 {
+        let now_hour = env.ledger().timestamp() / SECONDS_PER_HOUR;
+        let start = now_hour.saturating_sub(WINDOW_HOURS - 1);
+        let mut total = 0_i128;
+        let mut h = start;
+        while h <= now_hour {
+            let bucket: i128 = env
+                .storage()
+                .persistent()
+                .get(&DataKey::HourSpent(h))
+                .unwrap_or(0);
+            total += bucket;
+            h += 1;
+        }
+        total
+    }
+
+    fn record_window_spend(env: &Env, amount: i128) {
+        let hour = env.ledger().timestamp() / SECONDS_PER_HOUR;
+        let bucket: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::HourSpent(hour))
+            .unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&DataKey::HourSpent(hour), &(bucket + amount));
     }
 
     /// Whitelist OR earned-reputation gate. See `set_reputation_policy`.
@@ -372,13 +647,6 @@ impl Treasury {
             }
             _ => Err(Error::PayeeNotWhitelisted),
         }
-    }
-
-    fn day_spent_on(env: &Env, day: u64) -> i128 {
-        env.storage()
-            .persistent()
-            .get(&DataKey::DaySpent(day))
-            .unwrap_or(0)
     }
 }
 

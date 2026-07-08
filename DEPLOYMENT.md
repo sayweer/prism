@@ -35,7 +35,7 @@ Network: **Stellar Testnet** (`Test SDF Network ; September 2015`)
 
 Full policy (legit pay + per-task `#3` / daily-limit `#4` rejection + per-task accounting +
 day-rollover reset) is proven by the contract test suite — `cargo test` → **6/6 passing** —
-and exercised live in the dashboard demo. The treasury starts each demo clean at 500 USDC.
+and exercised live in the dashboard demo (6 core tests at v1; the suite has since grown — see the v3 section below). The treasury starts each demo clean at 500 USDC.
 
 ## Confidential compliance layer (ZK)
 
@@ -59,7 +59,7 @@ proof's public `dailyLimit / perTaskLimit / whitelistRoot` to byte-match the anc
 proof for some *self-chosen* policy can no longer attest. Each `periodId` is consumed once
 (persistent guard), so a compliant proof can't be replayed to mask a later non-compliant period.
 The verify call emitted `attested = { whitelist_root, period_id }` on-chain. Circuit witness tests
-(`npm test` in `circuits/`) → **5/5**; contract tests (`cargo test -p compliance_verifier`) → **4/4**
+(`npm test` in `circuits/`) → **6/6**; contract tests (`cargo test -p compliance_verifier`) → **4/4**
 (valid attest, tampered-proof trap, policy-mismatch trap, replay trap).
 
 **Honesty note.** The ZK layer hides Prism's *compliance ledger* — Prism's storage and events carry
@@ -111,14 +111,49 @@ Casper-adapted features on-chain. `zk-deployer` is admin + agent; token = native
 - **Escrow release** — locked funds released to the payee on approval: [tx `df742d98…`](https://stellar.expert/explorer/testnet/tx/df742d987d85efb517a164b68e36c9302c4daf623c15dcaf416c73cbb26f6c4b)
 - **Escrow refund** — an expired escrow unlocks back to free balance (`locked → 0`): [tx `b545aeb4…`](https://stellar.expert/explorer/testnet/tx/b545aeb489e8e36f73b195f299b5926f2387979cd71701bb428a8b099a718e46)
 
-Contract tests: `cargo test -p treasury` → **14/14** (6 core + 3 reputation + 5 escrow).
+Contract tests at the v2 milestone: 14/14 (6 core + 3 reputation + 5 escrow); the current suite is larger — see the v3 section below.
 The reputation source is an ERC-8004-style registry (`reputation_of(agent) → i128`); the
 oracle above is a demo stand-in for trionlabs/stellar-8004, which is the production target.
+
+## Treasury v3 + Treasury Registry — M2 agent infrastructure (live on testnet)
+
+M2 ([design spec](docs/superpowers/specs/2026-07-07-prism-m2-design.md)) ships agent
+**sessions** (time-bound, spend-capped, instantly revocable — the ONLY spender while
+active), the contract **lifecycle** (pause/resume, admin withdraw, limit updates, agent
+rotation), and a **rolling 24h window** (hourly buckets — closes audit finding C2).
+Deployed with the `seyit` identity; per-user deploys in the app instantiate v3.
+
+| Item | Value |
+|------|-------|
+| **Treasury v3.1 wasm hash (current)** | `7e103d8c177f3b46d4f7ccee695e7c9a92f5d3e5e55b96324173f923db9f9ae7` |
+| v3.1 upload tx (audit hardening: `admin_cancel_escrow` + deadline validation + escrow TTL + whitelist/rep-gate events) | [`e12e748b…43b3c`](https://stellar.expert/explorer/testnet/tx/e12e748bdaafa39a08c2bfe56e009fa507f951d93af16455cb7ece019a243b3c) |
+| Treasury v3 wasm hash | `2e6ab69e964b85a1954443d067d809c8519a20eb909fd16ac23abab318f184b8` |
+| v3 upload tx | [`aa81495d…90bef`](https://stellar.expert/explorer/testnet/tx/aa81495db875d28715acb056614614bd04094b4aaf67f80b05ffefd0ec590bef) |
+| v2.1 wasm hash (previous: escrow + free-balance guard) | `3f01e85ddf344e9f9298f828a43fe6acbb2666e5f36f6899d197a47021290280` |
+| **Treasury Registry** | [`CBEPVXK6…4ZE7`](https://stellar.expert/explorer/testnet/contract/CBEPVXK6BN2FZ3IYHV5KQUGROFHNBWBYHKHRZ5U3O7UWGIOPFOFE4ZE7) |
+| M2 smoke treasury (v3) | [`CCXC3DSK…XR7K`](https://stellar.expert/explorer/testnet/contract/CCXC3DSKCURJ76P3GNVCATBO572ZCZG6PHRPC22FTTGI7O3GFAHIXR7K) |
+
+Verified live on the smoke treasury:
+
+- **Rolling window** — a `pay` executes with the 24-bucket read footprint well inside tx
+  limits; `day_spent` reports the rolling sum.
+- **Pause** — `pay` while paused → `Error(Contract, #9)`; `admin_withdraw` still works
+  while paused (exit paths never lock).
+- **Limits** — `set_limits(100, 200)` → `Error(Contract, #11)`; after `set_limits`
+  lowered per-task, an over-limit `pay` → `Error(Contract, #3)` immediately.
+- **Session single-spender** — after `set_session`, the session key paid on-chain; the
+  ROOT agent's signature could no longer authorise `pay` (auth requires the session
+  agent); over-cap → `Error(Contract, #10)`; after `revoke_session` the root agent paid
+  again and `get_session` → `None`.
+- **Registry** — `register` + duplicate no-op + `treasuries_of` returning the treasury.
+
+Contract tests: `cargo test -p treasury` → **48/48** · `cargo test -p treasury_registry` → **3/3**.
 
 ## Error codes
 
 `1` InvalidAmount · `2` PayeeNotWhitelisted · `3` ExceedsTaskLimit · `4` ExceedsDailyLimit ·
-`5` BelowReputationThreshold · `6` InsufficientFreeBalance · `7` EscrowNotFound · `8` DeadlineNotReached
+`5` BelowReputationThreshold · `6` InsufficientFreeBalance · `7` EscrowNotFound · `8` DeadlineNotReached ·
+`9` Paused · `10` ExceedsSessionLimit · `11` InvalidLimits · `12` InvalidDeadline
 
 ## Funding rail — muxed attribution
 

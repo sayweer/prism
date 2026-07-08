@@ -3,7 +3,19 @@
 // backbone for Level 4's "10+ user wallet interactions". Logging never blocks the UX.
 import { supabase, supabaseConfigured } from "./supabase";
 
-export type ActivityAction = "deploy" | "fund" | "whitelist" | "pay" | "reject";
+export type ActivityAction =
+  | "deploy"
+  | "fund"
+  | "whitelist"
+  | "pay"
+  | "reject"
+  | "pause"
+  | "withdraw"
+  | "limits"
+  | "session_start"
+  | "session_revoke"
+  | "agent_pay"
+  | "register";
 
 export interface ActivityInput {
   walletAddress: string;
