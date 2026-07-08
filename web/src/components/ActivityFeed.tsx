@@ -43,7 +43,8 @@ export default function ActivityFeed() {
       if (!stopped) timer = setTimeout(tick, POLL_MS);
     };
 
-    (async () => {
+    const bootstrap = async () => {
+      if (stopped) return;
       try {
         const latest = await server.getLatestLedger();
         const start = Math.max(1, latest.sequence - 17280); // ~last day of activity (5s ledgers)
@@ -51,14 +52,20 @@ export default function ActivityFeed() {
         // pages — page through to the head up front (head-based stop), or the newest
         // events (past the first, often empty, page) never render and the feed looks dead.
         const { events: all, cursor: c } = await fetchAllEvents(server, { startLedger: start, contractIds });
+        if (stopped) return;
         setEvents(dedupeById(all.reverse()).slice(0, MAX_ITEMS));
         cursor = c;
         setState("live");
         timer = setTimeout(tick, POLL_MS);
       } catch {
+        // `tick` only ever starts after a successful bootstrap, so a failed one must
+        // reschedule itself — otherwise the feed stays dead for the whole session.
         setState("error");
+        if (!stopped) timer = setTimeout(bootstrap, POLL_MS);
       }
-    })();
+    };
+
+    bootstrap();
 
     return () => {
       stopped = true;
@@ -83,7 +90,11 @@ export default function ActivityFeed() {
         <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 8 }}>
           {events.length === 0 ? (
             <div style={{ color: "#7C7C92", fontSize: 14, padding: "20px 0" }}>
-              {state === "error" ? "Couldn't reach the RPC." : "Listening for new events…"}
+              {state === "error"
+                ? "Couldn't reach the RPC — retrying…"
+                : state === "connecting"
+                  ? "Loading the last 24h of events…"
+                  : "No on-chain events in the last 24h — new activity lands here live. Past transactions are in your Workspace."}
             </div>
           ) : (
             events.map((e) => (
