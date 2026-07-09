@@ -7,8 +7,12 @@
 - [x] CHANGELOG.md — 0.1.0 (IBW) → 0.2.0 (ZK+trust) → 0.3.0 (per-user) → 0.3.1 (onboarding)
 - [x] web/README.md — Vite boilerplate yerine gerçek dev dokümanı
 - [x] supabase/migrations/0001 — feedback+activity şeması + insert-only RLS repo'da
-- [ ] (ertelendi) lint borcu — 24 hata, çoğu generated treasuryClient.ts + eski
-      setState-in-effect kalıpları; CI gate'lemiyor, davranış riski nedeniyle ayrı iş
+- [~] (2026-07-09) lint borcu ele alındı: generated client'lar zaten eslint ignore'da;
+      gerçek borç 9 hata + 1 uyarıydı. Trivial olanlar düzeltildi (prefer-const, unused
+      disable, App.tsx any). Kalan 6× set-state-in-effect + 1× refs davranış riskli →
+      eslint.config.js'te 'warn'a çekildi (tarihli not). CI web job'u artık `npm run lint`
+      gate'liyor (warn'lar gate'lemez). Kalan iş: effect refactor'u yapılıp rule'lar
+      error'a geri alınacak.
 
 # Kova 1 — 10-kullanıcı push'u öncesi onboarding düzeltmeleri (2026-07-02)
 
@@ -36,9 +40,9 @@ takılmadan tamamlasın. Her madde ayrı commit; sonunda manuel Vercel deploy + 
 
 - Supabase `activity` + `feedback` RLS: enabled, sadece anon INSERT policy (SELECT yok) —
   canlı DB'de doğrulandı. Migration olarak repo'ya commit etmek → Kova 2.
-- `npm run lint` 24 hata veriyor; tamamına yakını önceden mevcut borç (generated
-  treasuryClient.ts, Dashboard/Analytics setState-in-effect). CI lint'i gate'lemiyor.
-  Temizlik → Kova 2.
+- `npm run lint` (2026-07-09 itibarıyla): 0 hata / 7 uyarı. Trivial hatalar düzeltildi;
+  generated client'lar zaten ignore'da; 6× set-state-in-effect + 1× refs 'warn'a çekildi
+  (effect refactor'una kadar). CI web job'u artık lint'i gate'liyor.
 - Kova 2 (dokümantasyon/kredibilite) ve Kova 3 (mimari: agent-signing, kontrat yaşam
   döngüsü, midnight burst, ZK entegrasyonu, ABI drift, analytics penceresi) bekliyor —
   ayrıntılar 2026-07-02 oturum değerlendirmesinde.

@@ -37,7 +37,7 @@ product shipped. No critical findings. Status of every finding:
 | C6 | Info | Narrow test coverage (single test) | ✅ Fixed — 14 contract tests (core + reputation + escrow) + 4 verifier tests + circuit & web suites, all in CI |
 | F3 | Medium | Missing client-side input validation (latent) | ✅ Largely fixed — contract-id checksum validation, amount guards; the contract remains the real gate |
 | C4 | Info | No admin withdraw/sweep — funds can strand if the agent key is lost or the whitelist is empty | ✅ Fixed (M2) — `admin_withdraw` (free balance, owner-signed, works while paused) + `set_paused` + `set_agent` rotation |
-| C3 | Low | No storage TTL management (`extend_ttl`) — long-idle entries can be archived | ⚠️ Open — roadmap M3 (mainnet hardening) |
+| C3 | Low | No storage TTL management (`extend_ttl`) — long-idle entries can be archived | ✅ Fixed (v3.2) — every mutation auto-extends the instance-storage TTL (`bump_instance`); persistent escrow entries were already TTL-managed (R2); proof test `mutation_extends_instance_ttl` |
 | C5 | Info | No constructor bounds on limits (e.g. per-task > daily) | ✅ Fixed (M2) — constructor and `set_limits` validate `0 < per_task ≤ daily` (`InvalidLimits` #11) |
 | F4 | Low | No CSP / security headers on the static site | ⚠️ Open — testnet demo scope |
 | — | Info | npm audit 0 CVEs · pinned lockfile · no postinstall scripts · clean git history | ✅ Verified at audit time |
@@ -69,7 +69,6 @@ fixed in **v3.1** the same day:
   single-party dev setup — a multi-party ceremony is a mainnet prerequisite (M3).
 - **The reputation oracle is a stand-in.** Scores are admin-set on testnet; production
   targets the [trionlabs/stellar-8004](https://github.com/trionlabs/stellar-8004) registries (M4).
-- **No storage TTL management yet** (C3) — long-idle entries can be archived; M3.
 
 ## Reporting a vulnerability
 

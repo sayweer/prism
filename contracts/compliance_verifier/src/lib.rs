@@ -1,6 +1,6 @@
 #![no_std]
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, symbol_short,
+    contract, contracterror, contractimpl, contracttype, panic_with_error, symbol_short,
     crypto::bn254::{Bn254Fr, Bn254G1Affine, Bn254G2Affine, BN254_G1_SERIALIZED_SIZE, BN254_G2_SERIALIZED_SIZE},
     Address, Bytes, BytesN, Env, Vec,
 };
@@ -13,6 +13,16 @@ mod test;
 #[repr(u32)]
 pub enum Groth16Error {
     MalformedVerifyingKey = 0,
+}
+
+/// Input-shape errors surfaced by `verify`, so a malformed submission fails closed with a
+/// clear code instead of an opaque slice/`try_into` panic.
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum VerifierError {
+    InvalidProofLength = 1,
+    InvalidPublicInputLength = 2,
 }
 
 #[derive(Clone)]
@@ -150,6 +160,15 @@ impl ComplianceVerifier {
     /// public_bytes = 12 field elements x 32 bytes     = 384 bytes
     ///   layout: [dailyLimit, perTaskLimit, whitelistRoot, periodId, commitments[8]]
     pub fn verify(env: Env, proof_bytes: Bytes, public_bytes: Bytes) {
+        // ---- INPUT SHAPE: fail closed with a typed error, not an opaque slice panic ----
+        // proof = a(64) + b(128) + c(64) = 256; public = 12 field elements x 32 = 384.
+        if proof_bytes.len() != 256 {
+            panic_with_error!(&env, VerifierError::InvalidProofLength);
+        }
+        if public_bytes.len() != 384 {
+            panic_with_error!(&env, VerifierError::InvalidPublicInputLength);
+        }
+
         // ---- POLICY BINDING: the proof must assert *this owner's* policy ----
         // Without this the verifier is a vacuous "some self-chosen policy held" oracle.
         let policy: ExpectedPolicy = env.storage().instance().get(&DataKey::Policy).unwrap();
