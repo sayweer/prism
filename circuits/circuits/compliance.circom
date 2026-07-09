@@ -100,7 +100,11 @@ template Compliance(N, levels, nBits) {
         }
     }
 
-    // daily limit: bound the total, then compare. N<=16 => total < 2^(nBits+4).
+    // daily limit: bound the total, then compare.
+    // Why N<=16 fits nBits+4 bits: each amount is Num2Bits(nBits)-bounded to
+    // <= 2^nBits - 1, so total <= N*(2^nBits - 1) = 2^(nBits+4) - N < 2^(nBits+4)
+    // at N=16 — a razor-thin margin (N units). For N > 16, widen BOTH the
+    // Num2Bits and LessEqThan below to nBits+5 (and re-run this bound).
     signal total;
     total <== sumTerms[N];
     component totalBits = Num2Bits(nBits + 4);
