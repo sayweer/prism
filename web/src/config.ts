@@ -91,7 +91,7 @@ export function fmtUSDC(stroops: bigint, maxFrac = 2): string {
   const v = neg ? -stroops : stroops;
   const whole = v / USDC_UNIT;
   const frac = v % USDC_UNIT;
-  let fracStr = frac.toString().padStart(7, "0").slice(0, maxFrac).replace(/0+$/, "");
+  const fracStr = frac.toString().padStart(7, "0").slice(0, maxFrac).replace(/0+$/, "");
   const wholeStr = whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   return (neg ? "-" : "") + wholeStr + (fracStr ? "." + fracStr : "");
 }

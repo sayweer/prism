@@ -122,6 +122,7 @@ export default function Wallet() {
       const res = await server.submitTransaction(toSubmit);
       setStatus({ kind: "success", msg: "Payment sent — confirmed on testnet ✓", hash: res.hash });
       setAmount("");
+      setDest("");
       await loadBalance(address);
     } catch (e) {
       setStatus({ kind: "error", msg: sendErr(e) });

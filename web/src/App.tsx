@@ -11,6 +11,7 @@ import { logFunnel } from "./lib/funnel";
 // chunk hash that no longer exists (404) → instead of a black screen, reload once to
 // fetch the fresh index + correct chunks.
 const RELOAD_AT = "prism_chunk_reload_at";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- any-prop passthrough: lazy() must accept components with any prop shape
 function lazyWithReload<T extends ComponentType<any>>(factory: () => Promise<{ default: T }>) {
   return lazy(() =>
     factory().catch(() => {
