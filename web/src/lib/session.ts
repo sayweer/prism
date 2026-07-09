@@ -71,7 +71,7 @@ export async function createSession(
   capXlm: number,
   durationHours: number,
   onPhase?: (phase: "registering" | "funding") => void,
-): Promise<PayResult & { sessionPk?: string }> {
+): Promise<PayResult & { sessionPk?: string; registered?: boolean }> {
   const kp = Keypair.random();
   const validUntil = BigInt(Math.floor(Date.now() / 1000) + Math.round(durationHours * 3600));
   onPhase?.("registering");
@@ -82,14 +82,19 @@ export async function createSession(
   try {
     await fundWithFriendbot(kp.publicKey()); // fresh key → the account never pre-exists
   } catch (e) {
+    // The session is ALREADY live on-chain (single-spender) and its secret is saved —
+    // signal `registered` so the caller reflects that truth (show revoke) instead of
+    // treating this as a plain failure that leaves the UI out of sync with the chain.
     return {
       ok: false,
+      registered: true,
+      sessionPk: kp.publicKey(),
       errorMessage: `Session registered, but funding its key failed (${
         e instanceof Error ? e.message : "friendbot error"
       }) — revoke the session below and start a new one.`,
     };
   }
-  return { ...res, sessionPk: kp.publicKey() };
+  return { ...res, sessionPk: kp.publicKey(), registered: true };
 }
 
 /** A zero-popup payment signed by the session key — the autonomous-agent path. */

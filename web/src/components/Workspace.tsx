@@ -32,6 +32,7 @@ import {
   sessionPay,
 } from "../lib/session";
 import { revokeSession } from "../lib/userTreasury";
+import { parseXlmAmount } from "../lib/validate";
 import { discoverTreasuries, registerTreasury } from "../lib/registry";
 import Analytics from "./Analytics";
 
@@ -197,16 +198,22 @@ export default function Workspace() {
 
   const create = useCallback(async () => {
     if (!address) return;
+    // Validate before the wallet popup — an empty/NaN field would otherwise reach
+    // toStroops(NaN) and throw an opaque "must be a non-negative number".
+    const dailyLimit = parseXlmAmount(daily, "daily limit");
+    if (!dailyLimit.ok) return setStatus({ kind: "error", msg: dailyLimit.msg });
+    const perTaskLimit = parseXlmAmount(perTask, "per-payment limit");
+    if (!perTaskLimit.ok) return setStatus({ kind: "error", msg: perTaskLimit.msg });
     // The v3 constructor rejects a self-contradicting policy on-chain — catch it
     // here first so the user gets a clear message instead of a failed deploy.
-    if (Number(perTask) > Number(daily)) {
+    if (perTaskLimit.value > dailyLimit.value) {
       setStatus({ kind: "error", msg: "Per-payment limit can't exceed the daily limit." });
       return;
     }
     setBusy("deploy");
     setStatus({ kind: "info", msg: "Deploying your treasury — confirm in your wallet…" });
     try {
-      const id = await deployTreasury(address, walletSignerFor(address), Number(daily), Number(perTask));
+      const id = await deployTreasury(address, walletSignerFor(address), dailyLimit.value, perTaskLimit.value);
       setTreasuryId(address, id);
       setTreasuryIdState(id);
       void logActivity({ walletAddress: address, treasuryId: id, action: "deploy" });
@@ -262,11 +269,13 @@ export default function Workspace() {
 
   const fund = useCallback(async () => {
     if (!address || !treasuryId) return;
+    const amt = parseXlmAmount(fundAmt);
+    if (!amt.ok) return setStatus({ kind: "error", msg: amt.msg });
     setBusy("fund");
     setStatus({ kind: "info", msg: "Funding — confirm in your wallet…" });
     try {
-      const hash = await fundTreasury(treasuryId, address, walletSignerFor(address), Number(fundAmt));
-      void logActivity({ walletAddress: address, treasuryId, action: "fund", txHash: hash, amountXlm: Number(fundAmt) });
+      const hash = await fundTreasury(treasuryId, address, walletSignerFor(address), amt.value);
+      void logActivity({ walletAddress: address, treasuryId, action: "fund", txHash: hash, amountXlm: amt.value });
       setStatus({ kind: "success", msg: "Funded ✓", hash });
       setFundAmt("");
       setRefreshKey((k) => k + 1);
@@ -300,6 +309,8 @@ export default function Workspace() {
 
   const spend = useCallback(async () => {
     if (!address || !treasuryId) return;
+    const amt = parseXlmAmount(payAmt);
+    if (!amt.ok) return setStatus({ kind: "error", msg: amt.msg });
     if (sessionActive && !sessionSecret) {
       setStatus({
         kind: "error",
@@ -316,15 +327,15 @@ export default function Workspace() {
       // Single-spender rule: an active session's key signs instead of the wallet.
       const res =
         sessionActive && sessionSecret
-          ? await sessionPay(treasuryId, sessionSecret, BigInt(Date.now()), payTo.trim(), Number(payAmt))
+          ? await sessionPay(treasuryId, sessionSecret, BigInt(Date.now()), payTo.trim(), amt.value)
           : await pay(
               makeTreasury(treasuryId, address, walletSignerFor(address)),
               BigInt(Date.now()),
               payTo.trim(),
-              Number(payAmt),
+              amt.value,
             );
       if (res.ok) {
-        void logActivity({ walletAddress: address, treasuryId, action: sessionActive ? "agent_pay" : "pay", txHash: res.hash, amountXlm: Number(payAmt) });
+        void logActivity({ walletAddress: address, treasuryId, action: sessionActive ? "agent_pay" : "pay", txHash: res.hash, amountXlm: amt.value });
         setStatus({
           kind: "success",
           msg: sessionActive ? "Payment settled ✓ — signed by the session agent, no wallet popup." : "Payment settled ✓",
@@ -334,7 +345,7 @@ export default function Workspace() {
         setRefreshKey((k) => k + 1);
       } else {
         trackViolation(treasuryId);
-        void logActivity({ walletAddress: address, treasuryId, action: "reject", amountXlm: Number(payAmt) });
+        void logActivity({ walletAddress: address, treasuryId, action: "reject", amountXlm: amt.value });
         setStatus({ kind: "error", msg: `Blocked by policy: ${res.errorMessage}` });
       }
       await loadState(treasuryId, address);
@@ -350,11 +361,15 @@ export default function Workspace() {
 
   const startSession = useCallback(async () => {
     if (!address || !treasuryId) return;
+    const cap = parseXlmAmount(sessionCap, "session cap");
+    if (!cap.ok) return setStatus({ kind: "error", msg: cap.msg });
+    const hours = parseXlmAmount(sessionHours, "duration");
+    if (!hours.ok) return setStatus({ kind: "error", msg: hours.msg });
     setBusy("session");
     setStatus({ kind: "info", msg: "Starting agent session — confirm in your wallet…" });
     try {
       const t = makeTreasury(treasuryId, address, walletSignerFor(address));
-      const res = await createSession(t, treasuryId, Number(sessionCap), Number(sessionHours), (phase) =>
+      const res = await createSession(t, treasuryId, cap.value, hours.value, (phase) =>
         setStatus({
           kind: "info",
           msg:
@@ -370,6 +385,16 @@ export default function Workspace() {
           kind: "success",
           msg: "Agent session started ✓ — payments below now sign without wallet popups.",
           hash: res.hash,
+        });
+        await loadState(treasuryId, address);
+      } else if (res.registered) {
+        // Session is live on-chain but its key couldn't be funded. Load the saved secret
+        // and refresh state so the UI matches the chain (active session + revoke control).
+        setSessionSecret(loadSessionSecret(treasuryId));
+        void logActivity({ walletAddress: address, treasuryId, action: "session_start" });
+        setStatus({
+          kind: "error",
+          msg: res.errorMessage ?? "Session registered but its key couldn't be funded — revoke it and start a new one.",
         });
         await loadState(treasuryId, address);
       } else {
@@ -460,13 +485,15 @@ export default function Workspace() {
 
   const withdraw = useCallback(async () => {
     if (!address || !treasuryId) return;
+    const amt = parseXlmAmount(withdrawAmt);
+    if (!amt.ok) return setStatus({ kind: "error", msg: amt.msg });
     setBusy("withdraw");
     setStatus({ kind: "info", msg: "Withdrawing — confirm in your wallet…" });
     try {
       const t = makeTreasury(treasuryId, address, walletSignerFor(address));
-      const res = await adminWithdraw(t, withdrawTo.trim() || address, Number(withdrawAmt));
+      const res = await adminWithdraw(t, withdrawTo.trim() || address, amt.value);
       if (res.ok) {
-        void logActivity({ walletAddress: address, treasuryId, action: "withdraw", txHash: res.hash, amountXlm: Number(withdrawAmt) });
+        void logActivity({ walletAddress: address, treasuryId, action: "withdraw", txHash: res.hash, amountXlm: amt.value });
         setStatus({ kind: "success", msg: "Withdrawn ✓", hash: res.hash });
         setWithdrawAmt("");
         setRefreshKey((k) => k + 1);
@@ -484,7 +511,11 @@ export default function Workspace() {
 
   const updateLimits = useCallback(async () => {
     if (!address || !treasuryId) return;
-    if (Number(newPerTask) > Number(newDaily)) {
+    const dailyLimit = parseXlmAmount(newDaily, "daily limit");
+    if (!dailyLimit.ok) return setStatus({ kind: "error", msg: dailyLimit.msg });
+    const perTaskLimit = parseXlmAmount(newPerTask, "per-payment limit");
+    if (!perTaskLimit.ok) return setStatus({ kind: "error", msg: perTaskLimit.msg });
+    if (perTaskLimit.value > dailyLimit.value) {
       setStatus({ kind: "error", msg: "Per-payment limit can't exceed the daily limit." });
       return;
     }
@@ -492,7 +523,7 @@ export default function Workspace() {
     setStatus({ kind: "info", msg: "Updating limits — confirm in your wallet…" });
     try {
       const t = makeTreasury(treasuryId, address, walletSignerFor(address));
-      const res = await setLimits(t, Number(newDaily), Number(newPerTask));
+      const res = await setLimits(t, dailyLimit.value, perTaskLimit.value);
       if (res.ok) {
         void logActivity({ walletAddress: address, treasuryId, action: "limits" });
         setStatus({ kind: "success", msg: "Limits updated ✓ — effective immediately.", hash: res.hash });

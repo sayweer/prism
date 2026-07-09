@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { rpc } from "@stellar/stellar-sdk";
 import { EXPLORER, RPC_URL, TREASURY_ID, VERIFIER_ID } from "../config";
 import { dedupeById, fetchAllEvents, fetchEventsPage, type FeedEvent } from "../lib/events";
-import { getAddress } from "../lib/walletKit";
+import { getAddress, onAddressChange } from "../lib/walletKit";
 import { getTreasuryId } from "../lib/treasuryStore";
 
 const POLL_MS = 6000; // ~1 testnet ledger
@@ -17,11 +17,20 @@ export default function ActivityFeed() {
 
   // Watch the connected user's own treasury alongside the demo treasury + verifier —
   // otherwise a user's payments never show up here and the feed looks broken.
-  const contractIds = useMemo(() => {
+  const [myTreasury, setMyTreasury] = useState<string | null>(() => {
     const addr = getAddress();
-    const mine = addr ? getTreasuryId(addr) : null;
-    return mine ? [TREASURY_ID, VERIFIER_ID, mine] : [TREASURY_ID, VERIFIER_ID];
-  }, []);
+    return addr ? getTreasuryId(addr) : null;
+  });
+
+  // Re-evaluate the user's own treasury whenever the wallet connects/disconnects, so a
+  // wallet connected AFTER this view mounted still gets its payments streamed in (the
+  // polling effect below re-subscribes because contractIds is in its dependency list).
+  useEffect(() => onAddressChange((a) => setMyTreasury(a ? getTreasuryId(a) : null)), []);
+
+  const contractIds = useMemo(
+    () => (myTreasury ? [TREASURY_ID, VERIFIER_ID, myTreasury] : [TREASURY_ID, VERIFIER_ID]),
+    [myTreasury],
+  );
 
   useEffect(() => {
     const server = new rpc.Server(RPC_URL);
