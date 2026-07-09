@@ -86,3 +86,50 @@ fn rejects_replayed_proof() {
     client.verify(&proof, &public); // 1st: attests
     client.verify(&proof, &public); // 2nd: same periodId -> trap
 }
+
+// Hardening v2: the anchored limits must fit the circuit's comparator bit-widths
+// (perTaskLimit: LessEqThan(64), dailyLimit: LessEqThan(68)). A wider anchor would
+// make the comparators misbehave, so the constructor rejects it at deploy time.
+#[test]
+#[should_panic(expected = "bit-width")]
+fn rejects_daily_limit_wider_than_68_bits() {
+    let env = Env::default();
+    let (_daily, per_task, root) = policy_from_fixture(&env);
+    let mut arr = [0u8; 32];
+    arr[23] = 0x10; // exactly 2^68 -> first value out of range
+    let wide_daily: BytesN<32> = BytesN::from_array(&env, &arr);
+    let admin = Address::generate(&env);
+    let _ = env.register(ComplianceVerifier, (admin, wide_daily, per_task, root));
+}
+
+#[test]
+#[should_panic(expected = "bit-width")]
+fn rejects_per_task_limit_wider_than_64_bits() {
+    let env = Env::default();
+    let (daily, _per_task, root) = policy_from_fixture(&env);
+    let mut arr = [0u8; 32];
+    arr[23] = 0x01; // exactly 2^64 -> first value out of range for the 64-bit comparator
+    let wide_per_task: BytesN<32> = BytesN::from_array(&env, &arr);
+    let admin = Address::generate(&env);
+    let _ = env.register(ComplianceVerifier, (admin, daily, wide_per_task, root));
+}
+
+#[test]
+fn accepts_limits_at_bit_width_boundary() {
+    let env = Env::default();
+    let (_daily, _per_task, root) = policy_from_fixture(&env);
+    // daily = 2^68 - 1 and per_task = 2^64 - 1: the widest in-range anchors.
+    let mut d = [0u8; 32];
+    d[23] = 0x0F;
+    let mut p = [0u8; 32];
+    for i in 24..32 {
+        d[i] = 0xFF;
+        p[i] = 0xFF;
+    }
+    let daily: BytesN<32> = BytesN::from_array(&env, &d);
+    let per_task: BytesN<32> = BytesN::from_array(&env, &p);
+    let admin = Address::generate(&env);
+    let id = env.register(ComplianceVerifier, (admin, daily.clone(), per_task, root));
+    let client = ComplianceVerifierClient::new(&env, &id);
+    assert_eq!(client.get_policy().daily_limit, daily);
+}

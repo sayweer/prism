@@ -90,6 +90,22 @@ fn vk(env: &Env) -> VerificationKey {
     VerificationKey { alpha, beta, gamma, delta, ic }
 }
 
+/// True if the big-endian 32-byte value is < 2^max_bits.
+fn fits_bits(v: &BytesN<32>, max_bits: u32) -> bool {
+    let arr = v.to_array();
+    let full_zero_bytes = ((256 - max_bits) / 8) as usize;
+    let rem = (256 - max_bits) % 8;
+    for i in 0..full_zero_bytes {
+        if arr[i] != 0 {
+            return false;
+        }
+    }
+    if rem > 0 && (arr[full_zero_bytes] >> (8 - rem)) != 0 {
+        return false;
+    }
+    true
+}
+
 #[contract]
 pub struct ComplianceVerifier;
 
@@ -98,6 +114,11 @@ impl ComplianceVerifier {
     /// Atomic init at deploy time. Anchors the policy the proofs are checked against
     /// (32-byte field-element encoding of dailyLimit, perTaskLimit, whitelistRoot)
     /// and records the owner. No front-runnable `initialize`.
+    ///
+    /// The anchored limits must fit the circuit's comparator bit-widths
+    /// (perTaskLimit: LessEqThan(nBits=64), dailyLimit: LessEqThan(nBits+4=68) in
+    /// compliance.circom). A wider anchor would make the comparators misbehave for
+    /// values no honest prover can produce, so it is rejected at deploy time.
     pub fn __constructor(
         env: Env,
         admin: Address,
@@ -105,6 +126,9 @@ impl ComplianceVerifier {
         per_task_limit: BytesN<32>,
         whitelist_root: BytesN<32>,
     ) {
+        if !fits_bits(&daily_limit, 68) || !fits_bits(&per_task_limit, 64) {
+            panic!("limit exceeds circuit bit-width");
+        }
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(
             &DataKey::Policy,
