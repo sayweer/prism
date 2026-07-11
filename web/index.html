@@ -28,10 +28,21 @@
     <link rel="preconnect" href="https://api.fontshare.com" />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
     <title>Prism — bounded agent treasury on Stellar</title>
-    <style>html,body{background:#08080b}</style>
+    <style>
+      html,body{background:#08080b}
+      /* pre-hydration splash — painted instantly, replaced when React mounts.
+         150ms fade-in delay keeps it invisible on fast loads. */
+      .boot{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#f3f1ec;font-family:Georgia,'Times New Roman',serif}
+      .boot__m{display:flex;align-items:center;gap:12px;font-size:22px;opacity:0;animation:bootin .5s ease .15s forwards}
+      .boot__glyph{width:10px;height:10px;border-radius:50%;background:#FDDA24;box-shadow:0 0 14px #FDDA24;animation:bootpulse 1.6s ease-in-out .15s infinite}
+      @keyframes bootin{to{opacity:.9}}
+      @keyframes bootpulse{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot"><div class="boot__m"><span class="boot__glyph"></span>Prism</div></div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
