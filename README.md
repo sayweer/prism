@@ -22,6 +22,22 @@ A non-custodial Soroban treasury that lets a business hand an autonomous AI agen
 
 ---
 
+## What P·R·I·S·M stands for
+
+> **A leash, not a wallet.** An agent spends on a **Leash** — scoped, expiring authority — never with the keys to the vault.
+
+| | Guarantee | Meaning |
+|---|---|---|
+| **P** | Policy-enforced | Every spend passes the contract's rules — not the model's judgement. |
+| **R** | Revocable | Leashes expire on their own; pause the agent or withdraw at any time. |
+| **I** | Invisible | Amounts and payees proven in-policy — sealed, never disclosed. |
+| **S** | Self-custodial | Funds live in the owner's contract. Never with us, never with the agent. |
+| **M** | Machine-speed | Sub-cent, sub-5-second settlement on Stellar — x402-native. |
+
+**Vocabulary:** a **Leash** is the time-bound, spend-capped session key an agent signs with; a **Sealed Receipt** is the on-chain ZK attestation (the `attested` event) proving a payment stayed in policy without revealing the amount or the payee.
+
+---
+
 ## 🏆 Built during Stellar Hacks: Real-World ZK
 
 Prism's bounded-treasury core predates this hackathon (built at IBW 2026). **Everything zero-knowledge — Prism's entire Confidential layer — was designed and built inside the Stellar Hacks: Real-World ZK window (June 18–22, 2026)**, and is the focus of this submission:

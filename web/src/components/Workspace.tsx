@@ -642,7 +642,7 @@ export default function Workspace() {
             </Section>
 
             {!legacy && lifecycle && (
-              <Section title="Agent session">
+              <Section title="Leash — agent session">
                 {sessionActive && lifecycle.session ? (
                   <>
                     <div style={hintRow}>
@@ -663,20 +663,20 @@ export default function Workspace() {
                       </div>
                     )}
                     <button style={{ ...ghostBtn, opacity: busy ? 0.6 : 1 }} onClick={endSession} disabled={!!busy}>
-                      {busy === "revoke" ? "Revoking…" : "Revoke session"}
+                      {busy === "revoke" ? "Revoking…" : "Revoke Leash"}
                     </button>
                   </>
                 ) : (
                   <>
                     <div style={hintRow}>
-                      Hand this treasury to an autonomous agent: a time-bound, spend-capped
-                      key signs payments with no wallet popups — the contract still enforces
-                      every limit.
+                      Hand this treasury to an autonomous agent on a Leash: a time-bound,
+                      spend-capped key signs payments with no wallet popups — the contract
+                      still enforces every limit.
                     </div>
                     <input style={input} inputMode="decimal" placeholder="Session cap (XLM)" aria-label="Session spending cap in XLM" value={sessionCap} onChange={(e) => setSessionCap(e.target.value)} />
                     <input style={input} inputMode="decimal" placeholder="Duration (hours)" aria-label="Session duration in hours" value={sessionHours} onChange={(e) => setSessionHours(e.target.value)} />
                     <button style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }} onClick={startSession} disabled={!!busy}>
-                      {busy === "session" ? "Starting…" : "Start agent session"}
+                      {busy === "session" ? "Starting…" : "Start Leash"}
                     </button>
                   </>
                 )}
