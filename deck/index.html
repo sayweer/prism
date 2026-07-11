@@ -99,6 +99,21 @@ h2{font-family:var(--display);font-weight:600;line-height:1.02;letter-spacing:-.
 .punch{margin-top:34px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
 .punch .big{font-family:var(--display);font-weight:600;font-size:clamp(22px,2.6vw,34px);letter-spacing:-.02em;}
 
+/* creed (what PRISM stands for) */
+.creed{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-top:40px;}
+@media(max-width:900px){.creed{grid-template-columns:repeat(2,1fr);}}
+.cc{padding:22px 18px;border-radius:16px;}
+.cc .L{font-family:var(--display);font-weight:600;font-size:clamp(30px,3.4vw,46px);line-height:1;}
+.cc h3{font-family:var(--grotesk);font-weight:600;font-size:16px;margin-top:12px;}
+.cc p{color:var(--muted);font-size:13.5px;margin-top:6px;line-height:1.42;}
+
+/* market validation bar */
+.valbar{margin-top:26px;padding:22px 28px;border-radius:18px;display:flex;gap:28px;align-items:center;flex-wrap:wrap;}
+.valbar .amt{font-family:var(--display);font-weight:600;font-size:clamp(30px,3.6vw,48px);background:var(--spectrum);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.valbar p{color:var(--muted);font-size:14.5px;line-height:1.5;flex:1;min-width:280px;}
+.valbar p b{color:var(--text);}
+.valbar p i{color:var(--text);}
+
 /* team */
 .team{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:40px;}
 @media(max-width:760px){.team{grid-template-columns:1fr;}}
@@ -120,7 +135,7 @@ h2{font-family:var(--display);font-weight:600;line-height:1.02;letter-spacing:-.
 .topbar .b{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:600;font-size:16px;color:var(--text);opacity:.9;}
 .counter{font-family:var(--mono);font-size:13px;color:var(--dim);}
 .bar{position:fixed;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.06);z-index:30;}
-.bar__fill{height:100%;background:var(--spectrum);width:14.28%;transition:width .5s ease;box-shadow:0 0 14px rgba(124,58,237,.7);}
+.bar__fill{height:100%;background:var(--spectrum);width:9.09%;transition:width .5s ease;box-shadow:0 0 14px rgba(124,58,237,.7);}
 .nav{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:14px;z-index:31;}
 .dots{display:flex;gap:8px;}
 .ddot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.18);cursor:pointer;transition:all .3s;}
@@ -139,7 +154,7 @@ h2{font-family:var(--display);font-weight:600;line-height:1.02;letter-spacing:-.
     <svg width="22" height="22" viewBox="0 0 32 32" fill="none"><path d="M16 3 L29 26 L3 26 Z" stroke="url(#tg)" stroke-width="1.8" fill="rgba(124,58,237,0.10)"/><defs><linearGradient id="tg" x1="3" y1="26" x2="29" y2="3"><stop stop-color="#7C3AED"/><stop offset=".5" stop-color="#4F46E5"/><stop offset="1" stop-color="#22D3EE"/></linearGradient></defs></svg>
     Prism
   </div>
-  <div class="counter">1 / 10</div>
+  <div class="counter">1 / 11</div>
 </div>
 
 <div class="deck" id="deck">
@@ -154,6 +169,7 @@ h2{font-family:var(--display);font-weight:600;line-height:1.02;letter-spacing:-.
         </div>
         <div class="eyebrow">Build on Stellar · IBW 2026 · Hack Agentic</div>
         <h1>The wallet your<br/>AI agent<br/><span class="spectral">can't drain.</span></h1>
+        <p class="lead" style="max-width:28ch">The <span class="kicker">safety layer</span> for agent money.</p>
         <div class="tag-row">
           <span class="pill"><span class="dot"></span> Live on Stellar testnet</span>
           <span class="pill">Non-custodial</span>
@@ -216,6 +232,22 @@ h2{font-family:var(--display);font-weight:600;line-height:1.02;letter-spacing:-.
     </div>
   </section>
 
+  <!-- CREED -->
+  <section class="slide">
+    <div class="wrap">
+      <div class="eyebrow">What P·R·I·S·M stands for</div>
+      <h2>A <span class="spectral">leash,</span> not a wallet.</h2>
+      <div class="creed">
+        <div class="glass cc"><div class="L spectral">P</div><h3>Policy-enforced</h3><p>The contract's rules — not the model's judgement.</p></div>
+        <div class="glass cc"><div class="L spectral">R</div><h3>Revocable</h3><p>Leashes expire; pause or withdraw anytime.</p></div>
+        <div class="glass cc"><div class="L spectral">I</div><h3>Invisible</h3><p>Proven in-policy — sealed, never disclosed.</p></div>
+        <div class="glass cc"><div class="L spectral">S</div><h3>Self-custodial</h3><p>Funds only ever in the owner's contract.</p></div>
+        <div class="glass cc"><div class="L spectral">M</div><h3>Machine-speed</h3><p>Sub-cent, sub-5s, x402-native.</p></div>
+      </div>
+      <p class="foot-line">An agent spends on a <b>Leash</b> — scoped, expiring authority — never with the keys to the vault.</p>
+    </div>
+  </section>
+
   <!-- 4 PMF -->
   <section class="slide">
     <div class="wrap">
@@ -234,6 +266,10 @@ h2{font-family:var(--display);font-weight:600;line-height:1.02;letter-spacing:-.
         <div class="glass pillar"><div class="n">AGENTS</div><p>The AI-agent market is projected past <b>$45B by 2030</b> — autonomous software that acts, not just answers.</p></div>
         <div class="glass pillar"><div class="n">PAYMENTS</div><p><b>Agentic payments</b> (x402, ACP) emerged in 2025 — a brand-new category of machines paying machines, per call.</p></div>
         <div class="glass pillar"><div class="n">THE GAP</div><p>Every one of them needs a wallet that <b>can't be drained</b>. That primitive doesn't exist yet.</p></div>
+      </div>
+      <div class="glass valbar">
+        <div class="amt">$33M</div>
+        <p><b>PayPal Ventures, General Catalyst &amp; Coinbase Ventures</b> just funded this exact category — Kite, agent spending rules on its own L1. <i>"Agents will need identities, programmable governance, and seamless payment flows."</i><br/>Prism ships those guarantees <b>Stellar-native</b> — open source, real ZK, no new chain, no token.</p>
       </div>
       <p class="foot-line">Every autonomous agent that spends money is a <b class="spectral">Prism</b> treasury.</p>
     </div>
