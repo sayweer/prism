@@ -194,6 +194,33 @@ export default function Landing({
           </div>
         </header>
 
+        {/* proven in public — real, verifiable proof only (no logo wall) */}
+        <Reveal className="proofstrip" delay={0.05}>
+          <span className="pk">Proven in public</span>
+          <span className="badge"><b className="medal">2nd place</b> IBW 2026 · BuildOn Stellar — Agentic Track</span>
+          <a className="badge" href="https://github.com/Bekirerdem/prism" target="_blank" rel="noreferrer">Open source · <b>MIT</b> — read every line ↗</a>
+          {/* snapshot 2026-07-11 — refresh from Supabase `activity` when the numbers grow */}
+          <button className="badge" onClick={onActivity}><b>4</b> user treasuries · <b>5</b> payments · <b>5</b> drains blocked — all on-chain</button>
+          <a className="badge" href="https://github.com/Bekirerdem/prism" target="_blank" rel="noreferrer"><b>140+</b> tests green · contract v3.1</a>
+          <a className="badge" href="https://github.com/stellar/stellar-dev-skill/pull/50" target="_blank" rel="noreferrer">Stellar Dev Skills — community skill submitted ↗</a>
+        </Reveal>
+
+        {/* 00 creed — the name is the framework */}
+        <section className="band creed" id="prism">
+          <Reveal><div className="kick"><span className="no">00</span><span className="eyebrow">What PRISM stands for</span></div></Reveal>
+          <RevealLines tag="h2" className="title" lines={[<>A <em>leash,</em> not a wallet.</>]} />
+          <Reveal delay={0.1}><p className="lead2">Five guarantees, one name. An agent spends on a Leash — scoped, expiring authority — never with the keys to the vault.</p></Reveal>
+          <div className="creed__grid">
+            {CREED.map((c, i) => (
+              <Reveal className="creed__cell" key={c.k} delay={i * 0.06}>
+                <div className="ltr">{c.k}</div>
+                <h4>{c.t}</h4>
+                <p>{c.p}</p>
+              </Reveal>
+            ))}
+          </div>
+        </section>
+
         {/* 01 rails */}
         <section className="band" id="how">
           <Reveal><div className="kick"><span className="no">01</span><span className="eyebrow">Two rails · one contract</span></div></Reveal>
@@ -237,12 +264,12 @@ export default function Landing({
             <div className="feat__txt">
               <Reveal><span className="eyebrow accent">New since hackathon</span></Reveal>
               <RevealLines tag="h2" delay={0.05} lines={[<>Prove every payment was in policy — <em>reveal nothing.</em></>]} />
-              <Reveal delay={0.12}><p>A Groth16/BN254 circuit proves the payment sits inside its per-task and daily bounds and pays a whitelisted payee — without disclosing the amount or the recipient. The treasury verifies the proof on-chain and emits an attestation.</p></Reveal>
+              <Reveal delay={0.12}><p>A Groth16/BN254 circuit proves the payment sits inside its per-task and daily bounds and pays a whitelisted payee — without disclosing the amount or the recipient. The treasury verifies the proof on-chain and issues a Sealed Receipt.</p></Reveal>
               <Reveal delay={0.2}>
                 <div className="pts">
                   <div>Poseidon-Merkle whitelist + commitment binding (amount, payee, salt)</div>
                   <div>On-chain BN254 verifier — policy-bound, replay-guarded</div>
-                  <div>Emits <span className="mono">attested</span> — auditable, not disclosed</div>
+                  <div>Emits <span className="mono">attested</span> — a Sealed Receipt: auditable, not disclosed</div>
                 </div>
               </Reveal>
             </div>
@@ -364,4 +391,13 @@ const GUARDS = [
   { n: "02", t: "Per-task limit", p: "Each task can spend up to a hard cap — no single job overspends." },
   { n: "03", t: "Daily limit", p: "A daily UTC ceiling — runaway loops hit a wall, every calendar day." },
   { n: "04", t: "Auto-accounting", p: "Spend is tagged to its task on-chain — reconcile with zero memos." },
+];
+
+/* the name is the framework — each letter is a guarantee */
+const CREED = [
+  { k: "P", t: "Policy-enforced", p: "Every spend passes the contract's rules — not the model's judgement." },
+  { k: "R", t: "Revocable", p: "Leashes expire on their own; pause the agent or withdraw at any time." },
+  { k: "I", t: "Invisible", p: "Amounts and payees proven in-policy — sealed, never disclosed." },
+  { k: "S", t: "Self-custodial", p: "Funds live in the owner's contract. Never with us, never with the agent." },
+  { k: "M", t: "Machine-speed", p: "Sub-cent, sub-5-second settlement on Stellar — x402-native." },
 ];
