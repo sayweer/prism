@@ -6,9 +6,12 @@ import { rpc } from "@stellar/stellar-sdk";
 import { RPC_URL } from "../config";
 import { dedupeById, fetchAllEvents, type FeedEvent } from "../lib/events";
 import { agentScorecard, getMonitor, spendSeries } from "../lib/analytics";
+import { loadLedger, recordEvents } from "../lib/eventLedger";
 
 export default function Analytics({ contractId, refreshKey = 0 }: { contractId: string; refreshKey?: number }) {
-  const [events, setEvents] = useState<FeedEvent[]>([]);
+  // Seed from the persistent ledger so payments older than the RPC's event-retention
+  // window (which a fresh scan can no longer see) never drop out of the counters.
+  const [events, setEvents] = useState<FeedEvent[]>(() => loadLedger(contractId));
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [tick, setTick] = useState(0);
   // Last read's paging cursor + events, so a refresh continues from where the previous
@@ -21,6 +24,7 @@ export default function Analytics({ contractId, refreshKey = 0 }: { contractId: 
   useEffect(() => {
     let alive = true;
     setState("loading");
+    setEvents(loadLedger(contractId)); // instant paint from the ledger while the scan runs
     (async () => {
       const server = new rpc.Server(RPC_URL);
 
@@ -33,7 +37,7 @@ export default function Analytics({ contractId, refreshKey = 0 }: { contractId: 
           cacheRef.current = { contractId, cursor: page.cursor || cached.cursor, events: merged };
           if (page.truncated) console.warn("Analytics: event history truncated at the page cap — totals may be partial.");
           if (alive) {
-            setEvents(merged);
+            setEvents(recordEvents(contractId, merged));
             setState("ready");
           }
           return;
@@ -59,7 +63,7 @@ export default function Analytics({ contractId, refreshKey = 0 }: { contractId: 
         cacheRef.current = { contractId, cursor: page.cursor, events: page.events };
         if (page.truncated) console.warn("Analytics: event history truncated at the page cap — totals may be partial.");
         if (alive) {
-          setEvents(page.events);
+          setEvents(recordEvents(contractId, page.events));
           setState("ready");
         }
       } catch {
