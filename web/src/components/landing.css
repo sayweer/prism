@@ -204,12 +204,25 @@
 .lx .reason{ margin-top:24px; font-family:var(--lx-mono); font-size:12.5px; color:var(--lx-danger); display:inline-flex; gap:9px; align-items:center; }
 .lx .reason::before{ content:"✕"; }
 
+/* rogue zoom-in timeline (the moment, step by step) */
+.lx .tl{ margin-top:26px; display:flex; flex-direction:column; gap:13px; }
+.lx .tl .tlr{ display:flex; gap:13px; align-items:flex-start; font-size:14.5px; color:var(--lx-muted); }
+.lx .tl .tlr .tn{ font-family:var(--lx-mono); font-size:11px; color:var(--lx-dim); border:1px solid var(--lx-line2); border-radius:6px; padding:2px 8px; margin-top:2px; flex:none; }
+.lx .tl .tlr i{ color:var(--lx-text); }
+.lx .tl .tlr.bad, .lx .tl .tlr.bad .mono{ color:var(--lx-danger); }
+.lx .tlnote{ margin-top:20px; font-family:var(--lx-mono); font-size:12px; color:var(--lx-dim); line-height:1.7; }
+.lx .tlnote .linklike{ background:none; border:none; padding:0; font:inherit; color:var(--lx-accent); cursor:pointer; }
+.lx .tlnote .linklike:hover{ filter:brightness(1.15); }
+
 /* final */
 .lx .final{ text-align:center; padding:150px 0; border-top:1px solid var(--lx-line); position:relative; }
 .lx .final h2{ font-family:var(--lx-serif); font-weight:500; font-size:clamp(40px,5.4vw,76px); letter-spacing:-.025em; margin:0; line-height:1; }
 .lx .final h2 em{ font-style:italic; color:var(--lx-accent); }
 .lx .final p{ color:var(--lx-muted); font-size:17px; margin:22px auto 0; max-width:46ch; }
 .lx .final .cta{ display:flex; gap:14px; justify-content:center; margin-top:40px; flex-wrap:wrap; }
+/* closing echo — the page opens with the hook, closes with its sibling */
+.lx .final p.echo{ font-family:var(--lx-serif); font-size:clamp(21px,2.6vw,32px); color:var(--lx-text); margin-top:72px; max-width:none; letter-spacing:-.01em; }
+.lx .final p.echo em{ font-style:italic; color:var(--lx-accent); }
 
 /* corporate footer — product / resources / on-chain columns over a legal bar */
 .lx .foot2{ border-top:1px solid var(--lx-line); padding:64px 0 46px; }
