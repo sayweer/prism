@@ -38,6 +38,20 @@ A non-custodial Soroban treasury that lets a business hand an autonomous AI agen
 
 ---
 
+## Architecture
+
+<div align="center">
+<img src="docs/architecture.svg" width="920" alt="PRISM architecture — the owner deploys a bounded Soroban treasury and grants the agent a Leash; every pay() passes the on-chain guardrails; allowed payments settle in USDC, drains bounce, and the ZK verifier emits a Sealed Receipt."/>
+</div>
+
+- **Owner** is the root of trust: deploys the treasury, funds it, sets the Guardrails, and can pause or withdraw at any time.
+- **Agent** never holds funds — it holds a **Leash**: a time-bound, spend-capped, instantly revocable session key.
+- **Treasury** (Soroban) enforces every rule on-chain: payee whitelist *or* earned ERC-8004 reputation, per-task cap, rolling 24h cap, Leash limits, pause state. An out-of-policy payment reverts — the demo shows a prompt-injected drain bouncing live.
+- **ZK verifier** (Groth16/BN254) proves a payment sat inside policy without revealing the amount or the payee, and emits a **Sealed Receipt** — auditable, not disclosed.
+- **x402**: when a service answers `402 Payment Required`, the quoted charge settles through the same policy gate — an over-limit or wrong-payee quote never reaches settlement.
+
+---
+
 ## 🏆 Built during Stellar Hacks: Real-World ZK
 
 Prism's bounded-treasury core predates this hackathon (built at IBW 2026). **Everything zero-knowledge — Prism's entire Confidential layer — was designed and built inside the Stellar Hacks: Real-World ZK window (June 18–22, 2026)**, and is the focus of this submission:

@@ -1,6 +1,6 @@
 import { Suspense, lazy, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { TREASURY_ID, contractUrl } from "../config";
+import { REGISTRY_ID, TREASURY_ID, VERIFIER_ID, contractUrl } from "../config";
 import "./landing.css";
 
 // The wallet chip pulls in the wallet kit — lazy so the landing bundle stays light.
@@ -376,10 +376,40 @@ export default function Landing({
         </section>
 
         {/* footer */}
-        <footer className="foot">
-          <div className="b"><span className="glyph" /> Prism</div>
-          <div className="op"><i /> System operational · Build On Stellar IBW 2026 → Real-World ZK 2026</div>
-          <div className="op" style={{ color: "var(--lx-dim)" }}>Bekir Erdem · Seyit Ali Değirmen</div>
+        <footer className="foot2">
+          <div className="foot2__grid">
+            <div className="foot2__brand">
+              <div className="b"><span className="glyph" /> Prism</div>
+              <p>The safety layer for agent money — a non-custodial, contract-bounded agent treasury on Stellar.</p>
+              <div className="op"><i /> System operational · Stellar testnet</div>
+            </div>
+            <nav className="fcol" aria-label="Product">
+              <h5>Product</h5>
+              <button className="flink" onClick={onWorkspace}>Workspace</button>
+              <button className="flink" onClick={onLaunch}>Live demo</button>
+              <button className="flink" onClick={onActivity}>Activity feed</button>
+              <a className="flink" href="https://deck-bice-omega.vercel.app" target="_blank" rel="noreferrer">Pitch deck ↗</a>
+            </nav>
+            <nav className="fcol" aria-label="Resources">
+              <h5>Resources</h5>
+              <a className="flink" href="https://github.com/Bekirerdem/prism" target="_blank" rel="noreferrer">GitHub — MIT ↗</a>
+              <a className="flink" href="https://github.com/Bekirerdem/prism/blob/main/SECURITY.md" target="_blank" rel="noreferrer">Security policy ↗</a>
+              <a className="flink" href="https://github.com/Bekirerdem/prism/blob/main/ROADMAP.md" target="_blank" rel="noreferrer">Roadmap ↗</a>
+              <a className="flink" href="https://github.com/Bekirerdem/prism/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">Changelog ↗</a>
+              <a className="flink" href="https://github.com/Bekirerdem/prism/blob/main/SKILL.md" target="_blank" rel="noreferrer">SKILL.md — for AI agents ↗</a>
+            </nav>
+            <nav className="fcol" aria-label="On-chain">
+              <h5>On-chain</h5>
+              <a className="flink" href={contractUrl(TREASURY_ID)} target="_blank" rel="noreferrer">Treasury contract ↗</a>
+              <a className="flink" href={contractUrl(VERIFIER_ID)} target="_blank" rel="noreferrer">ZK verifier ↗</a>
+              <a className="flink" href={contractUrl(REGISTRY_ID)} target="_blank" rel="noreferrer">Treasury registry ↗</a>
+            </nav>
+          </div>
+          <div className="foot2__bar">
+            <span>MIT license · open source</span>
+            <span>Build On Stellar IBW 2026 → Real-World ZK 2026</span>
+            <span>Bekir Erdem · Seyit Ali Değirmen</span>
+          </div>
         </footer>
       </main>
     </div>
