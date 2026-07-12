@@ -21,7 +21,11 @@ import { errText } from "./wallet-errors";
 // over WalletConnect v2 — so without this module a mobile visitor with the wallet installed
 // still sees "not installed". Added first (top of the modal) and only when a project id is
 // configured, so the app never crashes without it.
-const WC_PROJECT_ID = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID as string | undefined;
+// Same invisible-char trap as supabase.ts: a BOM + CRLF smuggled into the env value made
+// Reown reject the project id (403 project-limits) and the WC modal silently never opened.
+const WC_PROJECT_ID =
+  (import.meta.env.VITE_WALLETCONNECT_PROJECT_ID as string | undefined)?.replace(/[^\x20-\x7E]/g, "") ||
+  undefined;
 
 const modules = [
   new FreighterModule(),
