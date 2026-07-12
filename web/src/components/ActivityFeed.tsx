@@ -1,15 +1,17 @@
-// Level 2 — real-time event synchronization. Cursor-polls Soroban RPC and streams the
-// treasury + verifier contract events into a live feed. (Premium visual pass is a later
-// phase with Gemini; this is the functional layer.)
+// Activity — the platform's full, live ledger. Three layers merged by tx hash:
+// (1) full history from Supabase `activity` (the RPC forgets old events; this doesn't),
+// (2) a Realtime INSERT subscription so any user's action lands here the second it's
+// logged, (3) the original Soroban RPC cursor-poll for richer on-chain event labels.
 import { useEffect, useMemo, useState } from "react";
 import { rpc } from "@stellar/stellar-sdk";
 import { EXPLORER, RPC_URL, TREASURY_ID, VERIFIER_ID } from "../config";
 import { dedupeById, fetchAllEvents, fetchEventsPage, type FeedEvent } from "../lib/events";
+import { fetchActivityHistory, mergeFeedEvents, subscribeActivity } from "../lib/activity";
 import { getAddress } from "../lib/walletKit";
 import { getTreasuryId } from "../lib/treasuryStore";
 
 const POLL_MS = 6000; // ~1 testnet ledger
-const MAX_ITEMS = 60;
+const MAX_ITEMS = 120;
 
 export default function ActivityFeed() {
   const [events, setEvents] = useState<FeedEvent[]>([]);
@@ -34,7 +36,7 @@ export default function ActivityFeed() {
       try {
         const page = await fetchEventsPage(server, cursor ? { cursor, contractIds } : ({ contractIds } as never));
         if (page.events.length) {
-          setEvents((prev) => dedupeById([...page.events.reverse(), ...prev]).slice(0, MAX_ITEMS));
+          setEvents((prev) => mergeFeedEvents(dedupeById(page.events), prev, MAX_ITEMS));
         }
         if (page.cursor) cursor = page.cursor;
       } catch {
@@ -45,31 +47,42 @@ export default function ActivityFeed() {
 
     const bootstrap = async () => {
       if (stopped) return;
+      // Full platform history first — it doesn't depend on the RPC, so the feed paints
+      // even when the RPC is down or the chain window has long forgotten the events.
+      const history = await fetchActivityHistory(MAX_ITEMS);
+      if (stopped) return;
+      if (history.length) setEvents((prev) => mergeFeedEvents(prev, history, MAX_ITEMS));
       try {
         const latest = await server.getLatestLedger();
-        const start = Math.max(1, latest.sequence - 17280); // ~last day of activity (5s ledgers)
+        const start = Math.max(1, latest.sequence - 17280); // RPC layer: ~last day, for richer labels
         // getEvents scans ~10k ledgers per call, so a day-wide window spans multiple
         // pages — page through to the head up front (head-based stop), or the newest
         // events (past the first, often empty, page) never render and the feed looks dead.
         const { events: all, cursor: c } = await fetchAllEvents(server, { startLedger: start, contractIds });
         if (stopped) return;
-        setEvents(dedupeById(all.reverse()).slice(0, MAX_ITEMS));
+        setEvents((prev) => mergeFeedEvents(dedupeById(all), prev, MAX_ITEMS));
         cursor = c;
         setState("live");
         timer = setTimeout(tick, POLL_MS);
       } catch {
         // `tick` only ever starts after a successful bootstrap, so a failed one must
-        // reschedule itself — otherwise the feed stays dead for the whole session.
-        setState("error");
+        // reschedule itself — otherwise the live layer stays dead for the whole session.
+        setState(history.length ? "live" : "error");
         if (!stopped) timer = setTimeout(bootstrap, POLL_MS);
       }
     };
 
     bootstrap();
 
+    // Realtime: any user's logged action lands here the moment it's inserted.
+    const unsubscribe = subscribeActivity((e) => {
+      if (!stopped) setEvents((prev) => mergeFeedEvents(prev, [e], MAX_ITEMS));
+    });
+
     return () => {
       stopped = true;
       clearTimeout(timer);
+      unsubscribe();
     };
   }, [contractIds]);
 
@@ -83,33 +96,38 @@ export default function ActivityFeed() {
           </span>
         </div>
         <p style={{ color: "#A0A0B8", marginTop: 6, fontSize: 14 }}>
-          Real-time on-chain events from the demo treasury, the ZK verifier — and your own
-          treasury when your wallet is connected.
+          Every treasury action across Prism — full history, streamed live. On-chain events
+          from the demo treasury, the ZK verifier and your own treasury ride on top.
         </p>
 
         <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 8 }}>
           {events.length === 0 ? (
             <div style={{ color: "#7C7C92", fontSize: 14, padding: "20px 0" }}>
               {state === "error"
-                ? "Couldn't reach the RPC — retrying…"
+                ? "Couldn't reach the network — retrying…"
                 : state === "connecting"
-                  ? "Loading the last 24h of events…"
-                  : "No on-chain events in the last 24h — new activity lands here live. Past transactions are in your Workspace."}
+                  ? "Loading platform activity…"
+                  : "No activity yet — the first treasury action lands here live."}
             </div>
           ) : (
-            events.map((e) => (
-              <a
-                key={e.id}
-                style={item}
-                href={`${EXPLORER}/tx/${e.txHash}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <span style={kindTag(e.kind)}>{e.kind}</span>
-                <span style={{ flex: 1, fontSize: 13.5 }}>{e.label}</span>
-                <span style={{ color: "#7C7C92", fontSize: 11.5 }}>{timeAgo(e.at)}</span>
-              </a>
-            ))
+            events.map((e) => {
+              const inner = (
+                <>
+                  <span style={kindTag(e.kind)}>{e.kind}</span>
+                  <span style={{ flex: 1, fontSize: 13.5 }}>{e.label}</span>
+                  <span style={{ color: "#7C7C92", fontSize: 11.5 }}>{timeAgo(e.at)}</span>
+                </>
+              );
+              return e.txHash ? (
+                <a key={e.id} style={item} href={`${EXPLORER}/tx/${e.txHash}`} target="_blank" rel="noreferrer">
+                  {inner}
+                </a>
+              ) : (
+                <div key={e.id} style={item}>
+                  {inner}
+                </div>
+              );
+            })
           )}
         </div>
       </div>
@@ -138,12 +156,22 @@ const item: React.CSSProperties = {
   background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)",
   color: "#EDEDF4", textDecoration: "none",
 };
-const kindTag = (kind: string): React.CSSProperties => ({
-  fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700,
-  padding: "3px 7px", borderRadius: 6, whiteSpace: "nowrap",
-  background: kind === "attested" ? "rgba(34,211,238,0.16)" : "rgba(124,58,237,0.18)",
-  color: kind === "attested" ? "#22D3EE" : "#C4A8FF",
-});
+const KIND_COLORS: Record<string, [string, string]> = {
+  attested: ["rgba(34,211,238,0.16)", "#22D3EE"],
+  blocked: ["rgba(255,45,85,0.16)", "#FF6E8A"],
+  fund: ["rgba(201,255,35,0.13)", "#C9FF23"],
+  deploy: ["rgba(201,255,35,0.13)", "#C9FF23"],
+  leash: ["rgba(253,218,36,0.15)", "#FDDA24"],
+  lifecycle: ["rgba(160,160,184,0.14)", "#A0A0B8"],
+};
+const kindTag = (kind: string): React.CSSProperties => {
+  const [bg, fg] = KIND_COLORS[kind] ?? ["rgba(124,58,237,0.18)", "#C4A8FF"];
+  return {
+    fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 700,
+    padding: "3px 7px", borderRadius: 6, whiteSpace: "nowrap",
+    background: bg, color: fg,
+  };
+};
 const dot = (state: string): React.CSSProperties => ({
   fontSize: 12, fontWeight: 600,
   color: state === "live" ? "#00FF43" : state === "error" ? "#FF5D5D" : "#A0A0B8",
