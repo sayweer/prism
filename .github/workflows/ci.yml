@@ -30,12 +30,36 @@ jobs:
           node-version: 22
       # npm install (not `npm ci`): the lockfile is generated on Windows, and a Linux
       # runner needs its own platform-specific optional deps (esbuild/rollup/etc).
-      - name: Install, test & build
+      - name: Install, lint, test & build
         working-directory: web
         run: |
           npm install
+          npm run lint
           npm test
           npm run build
+
+  circuits:
+    name: Circuits — witness tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # compliance.test.ts compiles compliance.circom via circomkit's WitnessTester, so
+      # the circom binary must be on PATH (pinned to the version used locally). prove.test.ts
+      # is pure JS but runs in the same mocha pass. No ptau/snarkjs needed for witness tests.
+      - name: Install circom
+        run: |
+          curl -fsSL -o /usr/local/bin/circom \
+            https://github.com/iden3/circom/releases/download/v2.2.3/circom-linux-amd64
+          chmod +x /usr/local/bin/circom
+          circom --version
+      - name: Compliance circuit + prover tests
+        working-directory: circuits
+        run: |
+          npm install
+          npm test
 
   packages:
     name: Packages — x402 + prover

@@ -41,7 +41,10 @@ pub struct Config {
     pub token: Address,
     /// Max total spend allowed inside any rolling 24-hour window.
     pub daily_limit: i128,
-    /// Max spend allowed in a single payment.
+    /// Max spend allowed in a SINGLE payment (a per-PAYMENT cap, checked per call).
+    /// `TaskSpent` accumulates spend per `task_id` for attribution only — it is NOT
+    /// capped against this limit, so several sub-cap payments to the same task_id are
+    /// allowed; the real cumulative bound is the rolling 24h `daily_limit`.
     pub per_task_limit: i128,
 }
 
@@ -106,6 +109,14 @@ const SECONDS_PER_DAY: u64 = 86_400;
 // strand the funds: unreadable entry, permanently inflated lock).
 const LEDGERS_PER_WEEK: u32 = 120_960;
 const MAX_TTL_LEDGERS: u32 = 3_110_400; // ≈ 6 months of 5s ledgers (order of the network cap)
+// Instance storage (Config, Session, Locked, NextEscrowId, reputation policy, Paused) holds
+// the treasury's core policy. A low-activity treasury — e.g. one that only ever calls `pay`,
+// which writes to persistent buckets — would never otherwise bump its instance TTL, so it
+// could be archived and demand a RestoreFootprint before it works again. Every mutation
+// extends the instance TTL to keep the contract callable; cheap (a near-no-op once already
+// extended). Closes audit finding C3.
+const INSTANCE_TTL_THRESHOLD: u32 = LEDGERS_PER_WEEK; // extend once < ~1 week of TTL remains…
+const INSTANCE_TTL_EXTEND_TO: u32 = 4 * LEDGERS_PER_WEEK; // …back up to ~1 month
 
 #[contract]
 pub struct Treasury;
@@ -134,12 +145,14 @@ impl Treasury {
             per_task_limit,
         };
         env.storage().instance().set(&DataKey::Config, &cfg);
+        Self::bump_instance(&env);
     }
 
     /// Whitelist a payee. Admin-only.
     pub fn add_payee(env: Env, payee: Address) {
         let cfg = Self::cfg(&env);
         cfg.admin.require_auth();
+        Self::bump_instance(&env);
         env.storage()
             .persistent()
             .set(&DataKey::Payee(payee.clone()), &true);
@@ -150,6 +163,7 @@ impl Treasury {
     pub fn remove_payee(env: Env, payee: Address) {
         let cfg = Self::cfg(&env);
         cfg.admin.require_auth();
+        Self::bump_instance(&env);
         env.storage()
             .persistent()
             .remove(&DataKey::Payee(payee.clone()));
@@ -163,6 +177,7 @@ impl Treasury {
     pub fn set_reputation_policy(env: Env, registry: Address, min_reputation: i128) {
         let cfg = Self::cfg(&env);
         cfg.admin.require_auth();
+        Self::bump_instance(&env);
         env.storage()
             .instance()
             .set(&DataKey::RepRegistry, &registry);
@@ -197,6 +212,7 @@ impl Treasury {
     ) -> Result<(), Error> {
         let cfg = Self::cfg(&env);
         cfg.admin.require_auth();
+        Self::bump_instance(&env);
         if limit <= 0 || valid_until <= env.ledger().timestamp() {
             return Err(Error::InvalidLimits);
         }
@@ -217,6 +233,7 @@ impl Treasury {
     pub fn revoke_session(env: Env) {
         let cfg = Self::cfg(&env);
         cfg.admin.require_auth();
+        Self::bump_instance(&env);
         env.storage().instance().remove(&DataKey::Session);
         env.events().publish((symbol_short!("revoked"),), ());
     }
@@ -235,6 +252,7 @@ impl Treasury {
     pub fn set_paused(env: Env, paused: bool) {
         let cfg = Self::cfg(&env);
         cfg.admin.require_auth();
+        Self::bump_instance(&env);
         env.storage().instance().set(&DataKey::Paused, &paused);
         env.events().publish((symbol_short!("paused"),), paused);
     }
@@ -251,6 +269,7 @@ impl Treasury {
     pub fn admin_withdraw(env: Env, to: Address, amount: i128) -> Result<(), Error> {
         let cfg = Self::cfg(&env);
         cfg.admin.require_auth();
+        Self::bump_instance(&env);
         if amount <= 0 {
             return Err(Error::InvalidAmount);
         }
@@ -274,6 +293,7 @@ impl Treasury {
     pub fn set_limits(env: Env, daily_limit: i128, per_task_limit: i128) -> Result<(), Error> {
         let mut cfg = Self::cfg(&env);
         cfg.admin.require_auth();
+        Self::bump_instance(&env);
         if daily_limit <= 0 || per_task_limit <= 0 || per_task_limit > daily_limit {
             return Err(Error::InvalidLimits);
         }
@@ -290,6 +310,7 @@ impl Treasury {
     pub fn set_agent(env: Env, agent: Address) {
         let mut cfg = Self::cfg(&env);
         cfg.admin.require_auth();
+        Self::bump_instance(&env);
         cfg.agent = agent.clone();
         env.storage().instance().set(&DataKey::Config, &cfg);
         env.events().publish((symbol_short!("agent"),), agent);
@@ -305,6 +326,7 @@ impl Treasury {
         let cfg = Self::cfg(&env);
         Self::spender(&env, &cfg).require_auth();
         Self::require_not_paused(&env)?;
+        Self::bump_instance(&env);
 
         if amount <= 0 {
             return Err(Error::InvalidAmount);
@@ -371,6 +393,8 @@ impl Treasury {
             .unwrap_or(false)
     }
 
+    /// Cumulative spend recorded against `task_id` — an attribution ledger, not a cap.
+    /// (The per-call limit is `Config.per_task_limit`; the cumulative bound is the daily window.)
     pub fn task_spent(env: Env, task_id: u64) -> i128 {
         env.storage()
             .persistent()
@@ -404,6 +428,7 @@ impl Treasury {
         let cfg = Self::cfg(&env);
         Self::spender(&env, &cfg).require_auth();
         Self::require_not_paused(&env)?;
+        Self::bump_instance(&env);
 
         if amount <= 0 {
             return Err(Error::InvalidAmount);
@@ -468,6 +493,7 @@ impl Treasury {
         let cfg = Self::cfg(&env);
         cfg.admin.require_auth();
         Self::require_not_paused(&env)?;
+        Self::bump_instance(&env);
         let escrow: Escrow = env
             .storage()
             .persistent()
@@ -508,6 +534,7 @@ impl Treasury {
     pub fn refund_escrow(env: Env, id: u64) -> Result<(), Error> {
         let cfg = Self::cfg(&env);
         Self::spender(&env, &cfg).require_auth();
+        Self::bump_instance(&env);
         let escrow: Escrow = env
             .storage()
             .persistent()
@@ -535,6 +562,7 @@ impl Treasury {
     pub fn admin_cancel_escrow(env: Env, id: u64) -> Result<(), Error> {
         let cfg = Self::cfg(&env);
         cfg.admin.require_auth();
+        Self::bump_instance(&env);
         let escrow: Escrow = env
             .storage()
             .persistent()
@@ -566,6 +594,14 @@ impl Treasury {
 impl Treasury {
     fn cfg(env: &Env) -> Config {
         env.storage().instance().get(&DataKey::Config).unwrap()
+    }
+
+    /// Extend the instance storage TTL so the treasury's core policy can't be archived out
+    /// from under a low-activity treasury. Called by every mutation. Closes audit finding C3.
+    fn bump_instance(env: &Env) {
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_TTL_THRESHOLD, INSTANCE_TTL_EXTEND_TO);
     }
 
     /// The session, only while it is actually active (`now < valid_until`).

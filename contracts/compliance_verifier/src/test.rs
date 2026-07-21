@@ -133,3 +133,34 @@ fn accepts_limits_at_bit_width_boundary() {
     let client = ComplianceVerifierClient::new(&env, &id);
     assert_eq!(client.get_policy().daily_limit, daily);
 }
+
+// D2: malformed input lengths fail closed with a typed error (Error(Contract, #1)/#2)
+// instead of an opaque slice/try_into panic. proof = 256 bytes, public = 384 bytes.
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1)")]
+fn rejects_short_proof_bytes() {
+    let env = Env::default();
+    let (daily, per_task, root) = policy_from_fixture(&env);
+    let admin = Address::generate(&env);
+    let id = env.register(ComplianceVerifier, (admin, daily, per_task, root));
+    let client = ComplianceVerifierClient::new(&env, &id);
+
+    let short_proof = Bytes::from_slice(&env, &PROOF[..255]); // 255 != 256
+    let public = Bytes::from_slice(&env, PUBLIC);
+    client.verify(&short_proof, &public); // -> InvalidProofLength
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2)")]
+fn rejects_short_public_bytes() {
+    let env = Env::default();
+    let (daily, per_task, root) = policy_from_fixture(&env);
+    let admin = Address::generate(&env);
+    let id = env.register(ComplianceVerifier, (admin, daily, per_task, root));
+    let client = ComplianceVerifierClient::new(&env, &id);
+
+    let proof = Bytes::from_slice(&env, PROOF); // valid 256
+    let short_public = Bytes::from_slice(&env, &PUBLIC[..383]); // 383 != 384
+    client.verify(&proof, &short_public); // -> InvalidPublicInputLength
+}

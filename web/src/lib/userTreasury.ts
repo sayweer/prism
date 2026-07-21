@@ -18,11 +18,11 @@ import { NETWORK_PASSPHRASE, RPC_URL } from "../config";
 // Native XLM SAC on testnet — the token each user treasury holds and spends.
 export const XLM_SAC = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC";
 // Treasury WASM already installed on-chain — deploy just instantiates a new contract from it.
-// v3.1 (audit hardening: admin_cancel_escrow + deadline validation + escrow TTL +
-// whitelist/rep-gate events), installed 2026-07-07:
-// https://stellar.expert/explorer/testnet/tx/e12e748bdaafa39a08c2bfe56e009fa507f951d93af16455cb7ece019a243b3c
+// v3.2 (audit C3 closure: instance-storage TTL auto-extended on every mutation, so a
+// low-activity treasury can't be archived; + per-payment-limit doc clarity), installed 2026-07-09:
+// https://stellar.expert/explorer/testnet/tx/d97fc74fe0c2f750b27669690c9b7c58caffe4532501c7b98ed63afd5cbe7ab1
 export const TREASURY_WASM_HASH =
-  "7e103d8c177f3b46d4f7ccee695e7c9a92f5d3e5e55b96324173f923db9f9ae7";
+  "475cfbe2ca79d7977c8e4d29438ae70b9d95a12cb2bfcd9fed4e4f7a26d798b2";
 
 const XLM_UNIT = 10_000_000;
 
