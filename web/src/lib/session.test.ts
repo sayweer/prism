@@ -1,12 +1,26 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Keypair } from "@stellar/stellar-sdk";
 import {
   clearSessionSecret,
+  createSession,
   loadSessionSecret,
   saveSessionSecret,
   sessionIsActive,
   sessionSigner,
 } from "./session";
+
+// createSession registers the session on-chain, then friendbot-funds its key. Mock the
+// on-chain call to succeed and funding to fail, to exercise the partial-success path.
+vi.mock("./userTreasury", () => ({
+  setSession: vi.fn(async () => ({ ok: true, hash: "TX" })),
+  makeTreasury: vi.fn(),
+  pay: vi.fn(),
+}));
+vi.mock("./funding", () => ({
+  fundWithFriendbot: vi.fn(async () => {
+    throw new Error("friendbot rejected");
+  }),
+}));
 
 beforeEach(() => {
   const store: Record<string, string> = {};
@@ -70,5 +84,18 @@ describe("sessionSigner", () => {
     const { publicKey, signer } = sessionSigner(kp.secret());
     expect(publicKey).toBe(kp.publicKey());
     expect(typeof signer.signTransaction).toBe("function");
+  });
+});
+
+describe("createSession partial success", () => {
+  it("marks the session registered and keeps the secret when funding fails", async () => {
+    const res = await createSession({} as never, "CT_FUND_FAIL", 25, 24);
+    // Registration succeeded on-chain, only funding failed — the session is live and
+    // single-spender, so the secret must survive and the caller must learn it registered.
+    expect(res.ok).toBe(false);
+    expect(res.registered).toBe(true);
+    expect(res.sessionPk).toBeTruthy();
+    expect(loadSessionSecret("CT_FUND_FAIL")).not.toBeNull();
+    expect(res.errorMessage).toMatch(/funding its key failed/i);
   });
 });

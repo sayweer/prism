@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "users": "node scripts/user-count.mjs"
   },
   "dependencies": {
     "@creit.tech/stellar-wallets-kit": "^2.3.0",
