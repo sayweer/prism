@@ -69,6 +69,7 @@ export default function Workspace() {
   // undefined = not checked yet (or Horizon unreachable) → no gate shown; null = no account.
   const [walletXlm, setWalletXlm] = useState<number | null | undefined>(undefined);
   const [funding, setFunding] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const [daily, setDaily] = useState("50");
@@ -186,6 +187,7 @@ export default function Workspace() {
   }, [address, refreshWalletXlm]);
 
   const connect = useCallback(async () => {
+    setConnecting(true);
     try {
       const addr = await kitConnect();
       setAddress(addr);
@@ -193,6 +195,8 @@ export default function Workspace() {
       setStatus({ kind: "idle", msg: "" });
     } catch (e) {
       setStatus({ kind: "error", msg: connectErr(e) });
+    } finally {
+      setConnecting(false);
     }
   }, []);
 
@@ -571,7 +575,13 @@ export default function Workspace() {
         {!address ? (
           <>
             <p style={sub}>Connect a Stellar wallet (testnet) to open your own bounded treasury.</p>
-            <button style={primaryBtn} onClick={connect}>Connect a wallet</button>
+            <button
+              style={{ ...primaryBtn, opacity: connecting ? 0.6 : 1 }}
+              onClick={connect}
+              disabled={connecting}
+            >
+              {connecting ? "Connecting…" : "Connect a wallet"}
+            </button>
           </>
         ) : !treasuryId ? (
           <>

@@ -21,6 +21,7 @@ export default function WalletChip({
   const [address, setAddress] = useState<string | null>(getAddress());
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const walletRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => onAddressChange(setAddress), []);
@@ -35,10 +36,13 @@ export default function WalletChip({
   }, [menuOpen]);
 
   const connect = async () => {
+    setConnecting(true);
     try {
       await kitConnect();
     } catch {
       // User closed the wallet modal — nothing to surface here.
+    } finally {
+      setConnecting(false);
     }
   };
 
@@ -58,9 +62,10 @@ export default function WalletChip({
       <button
         className={`anav__cta${variant === "ghost" ? " anav__cta--ghost" : ""}`}
         onClick={connect}
+        disabled={connecting}
         type="button"
       >
-        Connect wallet
+        {connecting ? "Connecting…" : "Connect wallet"}
       </button>
     );
   }

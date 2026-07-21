@@ -13,6 +13,7 @@ export default function Analytics({ contractId, refreshKey = 0 }: { contractId: 
   // window (which a fresh scan can no longer see) never drop out of the counters.
   const [events, setEvents] = useState<FeedEvent[]>(() => loadLedger(contractId));
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [truncated, setTruncated] = useState(false);
   const [tick, setTick] = useState(0);
   // Last read's paging cursor + events, so a refresh continues from where the previous
   // read stopped (typically one RPC round-trip) instead of re-scanning all history.
@@ -38,6 +39,7 @@ export default function Analytics({ contractId, refreshKey = 0 }: { contractId: 
           if (page.truncated) console.warn("Analytics: event history truncated at the page cap — totals may be partial.");
           if (alive) {
             setEvents(recordEvents(contractId, merged));
+            setTruncated(page.truncated);
             setState("ready");
           }
           return;
@@ -64,6 +66,7 @@ export default function Analytics({ contractId, refreshKey = 0 }: { contractId: 
         if (page.truncated) console.warn("Analytics: event history truncated at the page cap — totals may be partial.");
         if (alive) {
           setEvents(recordEvents(contractId, page.events));
+          setTruncated(page.truncated);
           setState("ready");
         }
       } catch {
@@ -84,7 +87,7 @@ export default function Analytics({ contractId, refreshKey = 0 }: { contractId: 
     <div style={{ marginTop: 18 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={label}>Analytics &amp; monitoring</div>
-        <button style={refreshBtn} onClick={() => setTick((t) => t + 1)} type="button">↻ Refresh</button>
+        <button style={refreshBtn} onClick={() => setTick((t) => t + 1)} type="button" aria-label="Refresh analytics">↻ Refresh</button>
       </div>
       <div style={grid}>
         <Stat label="Payments" value={String(score.payments)} />
@@ -113,6 +116,11 @@ export default function Analytics({ contractId, refreshKey = 0 }: { contractId: 
               ? `Last payment ${timeAgo(score.lastAt)}`
               : "No payments yet — spend to see analytics."}
       </div>
+      {truncated && state === "ready" && (
+        <div style={{ fontSize: 11.5, color: "#E0A106", marginTop: 4 }}>
+          ⚠ Only the most recent events were read — totals may be partial.
+        </div>
+      )}
     </div>
   );
 }
