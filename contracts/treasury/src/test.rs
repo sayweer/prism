@@ -3,7 +3,7 @@
 use super::*;
 use soroban_sdk::{
     contract, contractimpl,
-    testutils::{Address as _, Ledger, MockAuth, MockAuthInvoke},
+    testutils::{storage::Instance as _, Address as _, Ledger, MockAuth, MockAuthInvoke},
     token::{StellarAssetClient, TokenClient},
     Address, Env, IntoVal,
 };
@@ -1145,4 +1145,83 @@ fn constructor_rejects_per_task_above_daily() {
     let agent = Address::generate(&env);
     let sac = env.register_stellar_asset_contract_v2(admin.clone());
     env.register(Treasury, (admin, agent, sac.address(), 100_i128, 200_i128));
+}
+
+// --- v3.2: instance TTL, cancel-vs-session, fail-closed registry ------------------
+
+/// Every mutation extends the instance storage TTL (via `bump_instance`) so a low-activity
+/// treasury's core policy can't be archived out from under it — audit finding C3. Proven
+/// here through set_paused; pay/create_escrow/etc. call the identical helper.
+#[test]
+fn mutation_extends_instance_ttl() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (_payee, client, _token) = setup(&env, 1000_i128, 100_i128);
+    let addr = client.address.clone();
+
+    // The constructor already bumped the instance TTL to EXTEND_TO. Advance the ledger so
+    // only a sliver of TTL remains — below the extend threshold…
+    let ttl0 = env.as_contract(&addr, || env.storage().instance().get_ttl());
+    env.ledger().with_mut(|li| li.sequence_number += ttl0 - 100);
+    let ttl_before = env.as_contract(&addr, || env.storage().instance().get_ttl());
+    assert!(ttl_before < INSTANCE_TTL_THRESHOLD);
+
+    // …then a mutation must bump it back up toward EXTEND_TO.
+    client.set_paused(&true);
+    let ttl_after = env.as_contract(&addr, || env.storage().instance().get_ttl());
+    assert!(ttl_after > ttl_before);
+    assert!(ttl_after >= INSTANCE_TTL_EXTEND_TO - 1);
+}
+
+/// admin_cancel_escrow releases the lock but, exactly like refund, does NOT restore the
+/// session budget — the cap bounds what a session may commit, cancelled or not.
+#[test]
+fn admin_cancel_escrow_does_not_restore_session_budget() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (payee, client, _token) = setup(&env, 1000_i128, 500_i128);
+    client.add_payee(&payee);
+
+    let sess = Address::generate(&env);
+    client.set_session(&sess, &(2 * SECONDS_PER_DAY), &100_i128);
+
+    let id = client.create_escrow(&1_u64, &payee, &70_i128, &SECONDS_PER_DAY);
+    assert_eq!(client.get_session().unwrap().spent, 70);
+
+    client.admin_cancel_escrow(&id);
+    assert_eq!(client.locked(), 0); // lock returned to the free balance
+    assert_eq!(client.get_session().unwrap().spent, 70); // budget NOT restored
+    assert_eq!(
+        client.try_pay(&2_u64, &payee, &40_i128),
+        Err(Ok(Error::ExceedsSessionLimit))
+    );
+}
+
+/// A reputation registry that traps when read — used to prove the treasury fails closed.
+#[contract]
+pub struct BrokenReputation;
+
+#[contractimpl]
+impl BrokenReputation {
+    pub fn reputation_of(_env: Env, _agent: Address) -> i128 {
+        panic!("registry unavailable");
+    }
+}
+
+/// If the reputation registry is unreachable (its call traps), `pay` must fail closed —
+/// the payment reverts and no funds move — rather than paying an unvetted payee.
+#[test]
+fn pay_fails_closed_when_registry_traps() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (_payee, client, token) = setup(&env, 1000_i128, 100_i128);
+
+    let broken = env.register(BrokenReputation, ());
+    client.set_reputation_policy(&broken, &1_i128);
+
+    // A non-whitelisted payee forces the reputation path → the registry traps.
+    let stranger = Address::generate(&env);
+    assert!(client.try_pay(&1_u64, &stranger, &10_i128).is_err());
+    assert_eq!(token.balance(&stranger), 0); // nothing paid
+    assert_eq!(client.day_spent(), 0); // no spend recorded
 }

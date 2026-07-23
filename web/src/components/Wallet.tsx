@@ -8,6 +8,8 @@ import { Asset, BASE_FEE, Horizon, Operation, TransactionBuilder } from "@stella
 import { EXPLORER, HORIZON_URL, NETWORK_PASSPHRASE, shortAddr } from "../config";
 import { connectErr, sendErr } from "../lib/wallet-errors";
 import { kit, connect as kitConnect, disconnect as kitDisconnect, getAddress, onAddressChange } from "../lib/walletKit";
+import { getXlmBalance } from "../lib/funding";
+import { isValidPaymentDest, parseXlmAmount } from "../lib/validate";
 
 const server = new Horizon.Server(HORIZON_URL);
 
@@ -17,19 +19,23 @@ export default function Wallet() {
   // Hydrate from the shared kit state — a wallet connected in the Workspace (or before
   // a reload) is the same session-wide connection, so show it here too.
   const [address, setAddress] = useState<string | null>(getAddress());
-  const [balance, setBalance] = useState<string | null>(null);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [balanceError, setBalanceError] = useState(false);
   const [dest, setDest] = useState("");
   const [amount, setAmount] = useState("");
   const [status, setStatus] = useState<Status>({ kind: "idle", msg: "" });
   const [busy, setBusy] = useState(false);
+  const [connecting, setConnecting] = useState(false);
 
   const loadBalance = useCallback(async (addr: string) => {
+    setBalanceError(false);
     try {
-      const acct = await server.loadAccount(addr);
-      const native = acct.balances.find((b) => b.asset_type === "native");
-      setBalance(native ? native.balance : "0");
+      // getXlmBalance distinguishes an unfunded account (404 → null) from a network/Horizon
+      // failure (throws) — so a transient RPC outage no longer masquerades as a "0" balance.
+      const xlm = await getXlmBalance(addr);
+      setBalance(xlm ?? 0);
     } catch {
-      setBalance("0"); // account not yet funded on testnet
+      setBalanceError(true);
     }
   }, []);
 
@@ -42,27 +48,39 @@ export default function Wallet() {
     () =>
       onAddressChange((a) => {
         setAddress(a);
-        if (!a) setBalance(null);
+        if (!a) {
+          // Disconnected elsewhere (nav chip) — clear derived + form state so nothing
+          // (stale dest/amount/status) leaks into the next wallet that connects.
+          setBalance(null);
+          setBalanceError(false);
+          setDest("");
+          setAmount("");
+          setStatus({ kind: "idle", msg: "" });
+        }
       }),
     [],
   );
 
   const connect = useCallback(async () => {
+    setConnecting(true);
     setStatus({ kind: "info", msg: "Choose a wallet…" });
     try {
       const addr = await kitConnect();
       setAddress(addr);
       setStatus({ kind: "idle", msg: "" });
-      await loadBalance(addr);
+      // Balance loads via the [address] effect — no need to fetch it a second time here.
     } catch (e) {
       setStatus({ kind: "error", msg: connectErr(e) });
+    } finally {
+      setConnecting(false);
     }
-  }, [loadBalance]);
+  }, []);
 
   const disconnect = useCallback(async () => {
     await kitDisconnect();
     setAddress(null);
     setBalance(null);
+    setBalanceError(false);
     setDest("");
     setAmount("");
     setStatus({ kind: "idle", msg: "" });
@@ -70,8 +88,13 @@ export default function Wallet() {
 
   const send = useCallback(async () => {
     if (!address) return;
-    if (!dest.trim() || !amount.trim()) {
-      setStatus({ kind: "error", msg: "Enter a destination address and an amount." });
+    if (!isValidPaymentDest(dest)) {
+      setStatus({ kind: "error", msg: "Enter a valid destination address (G… or M…)." });
+      return;
+    }
+    const parsed = parseXlmAmount(amount);
+    if (!parsed.ok) {
+      setStatus({ kind: "error", msg: parsed.msg });
       return;
     }
     setBusy(true);
@@ -99,6 +122,7 @@ export default function Wallet() {
       const res = await server.submitTransaction(toSubmit);
       setStatus({ kind: "success", msg: "Payment sent — confirmed on testnet ✓", hash: res.hash });
       setAmount("");
+      setDest("");
       await loadBalance(address);
     } catch (e) {
       setStatus({ kind: "error", msg: sendErr(e) });
@@ -121,8 +145,12 @@ export default function Wallet() {
         </p>
 
         {!address ? (
-          <button style={primaryBtn} onClick={connect}>
-            Connect a wallet
+          <button
+            style={{ ...primaryBtn, opacity: connecting ? 0.6 : 1 }}
+            onClick={connect}
+            disabled={connecting}
+          >
+            {connecting ? "Connecting…" : "Connect a wallet"}
           </button>
         ) : (
           <>
@@ -139,9 +167,18 @@ export default function Wallet() {
             <div style={balanceBox}>
               <div style={label}>Balance</div>
               <div style={{ fontSize: 28, fontWeight: 600 }}>
-                {balance === null ? "…" : `${balance} XLM`}
+                {balanceError
+                  ? "—"
+                  : balance === null
+                    ? "…"
+                    : `${balance.toLocaleString(undefined, { maximumFractionDigits: 7 })} XLM`}
               </div>
-              <button style={linkBtn} onClick={() => loadBalance(address)}>
+              {balanceError && (
+                <div style={{ color: "#FF5D5D", fontSize: 12.5, marginTop: 4 }}>
+                  Couldn't read your balance — tap refresh to retry.
+                </div>
+              )}
+              <button style={linkBtn} onClick={() => loadBalance(address)} aria-label="Refresh balance">
                 ↻ Refresh
               </button>
             </div>
@@ -151,12 +188,14 @@ export default function Wallet() {
               <input
                 style={input}
                 placeholder="Destination address (G…)"
+                aria-label="Destination address"
                 value={dest}
                 onChange={(e) => setDest(e.target.value)}
               />
               <input
                 style={input}
                 placeholder="Amount (XLM)"
+                aria-label="Amount in XLM"
                 inputMode="decimal"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}

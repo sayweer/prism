@@ -116,6 +116,7 @@ export default function Dashboard({ onHome }: { onHome: () => void }) {
   async function runRogue() {
     setBusy(true);
     await pay(ROGUE, true);
+    await refresh(); // keep state in sync with runAgent, in case of a partial effect
     setBusy(false);
   }
 

@@ -112,11 +112,18 @@ export async function pageToHead(
   const behindHead = () =>
     Boolean(page.cursor) && page.latestLedger > 0 && cursorLedger(page.cursor) <= page.latestLedger;
   while (pages < maxPages && behindHead()) {
+    const before = cursorLedger(page.cursor);
     page = await fetchPage(page.cursor);
     events = [...events, ...page.events];
     pages++;
+    // Head-stall: once the RPC has caught up to head it hands back an empty page whose
+    // cursor no longer advances. Without this, `behindHead()` (cursor ledger == latest)
+    // stays true and we spin to maxPages, reporting spurious truncation. Both conditions
+    // are required — an empty page whose cursor DID advance is just a quiet scan window.
+    if (page.events.length === 0 && cursorLedger(page.cursor) <= before) break;
   }
-  return { events, cursor: page.cursor, truncated: behindHead() };
+  // Only a real maxPages cut-off means history was left unread at the old end.
+  return { events, cursor: page.cursor, truncated: pages >= maxPages && behindHead() };
 }
 
 /** getEvents from `startLedger` (or an incremental `cursor`) up to the chain head. */

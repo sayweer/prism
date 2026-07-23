@@ -125,12 +125,15 @@ Deployed with the `seyit` identity; per-user deploys in the app instantiate v3.
 
 | Item | Value |
 |------|-------|
-| **Treasury v3.1 wasm hash (current)** | `7e103d8c177f3b46d4f7ccee695e7c9a92f5d3e5e55b96324173f923db9f9ae7` |
+| **Treasury v3.2 wasm hash (current)** | `475cfbe2ca79d7977c8e4d29438ae70b9d95a12cb2bfcd9fed4e4f7a26d798b2` |
+| v3.2 upload tx (audit **C3** closure: instance-storage TTL auto-extended on every mutation) | [`d97fc74f…7ab1`](https://stellar.expert/explorer/testnet/tx/d97fc74fe0c2f750b27669690c9b7c58caffe4532501c7b98ed63afd5cbe7ab1) |
+| Treasury v3.1 wasm hash (previous) | `7e103d8c177f3b46d4f7ccee695e7c9a92f5d3e5e55b96324173f923db9f9ae7` |
 | v3.1 upload tx (audit hardening: `admin_cancel_escrow` + deadline validation + escrow TTL + whitelist/rep-gate events) | [`e12e748b…43b3c`](https://stellar.expert/explorer/testnet/tx/e12e748bdaafa39a08c2bfe56e009fa507f951d93af16455cb7ece019a243b3c) |
 | Treasury v3 wasm hash | `2e6ab69e964b85a1954443d067d809c8519a20eb909fd16ac23abab318f184b8` |
 | v3 upload tx | [`aa81495d…90bef`](https://stellar.expert/explorer/testnet/tx/aa81495db875d28715acb056614614bd04094b4aaf67f80b05ffefd0ec590bef) |
 | v2.1 wasm hash (previous: escrow + free-balance guard) | `3f01e85ddf344e9f9298f828a43fe6acbb2666e5f36f6899d197a47021290280` |
 | **Treasury Registry** | [`CBEPVXK6…4ZE7`](https://stellar.expert/explorer/testnet/contract/CBEPVXK6BN2FZ3IYHV5KQUGROFHNBWBYHKHRZ5U3O7UWGIOPFOFE4ZE7) |
+| v3.2 smoke treasury | [`CAV6JJLD…BEAH`](https://stellar.expert/explorer/testnet/contract/CAV6JJLDKIGUFVU4MGYJH6VO7GALJKLT4I3DMDUU3TO2IDO2ERUCBEAH) |
 | M2 smoke treasury (v3) | [`CCXC3DSK…XR7K`](https://stellar.expert/explorer/testnet/contract/CCXC3DSKCURJ76P3GNVCATBO572ZCZG6PHRPC22FTTGI7O3GFAHIXR7K) |
 
 Verified live on the smoke treasury:
@@ -147,7 +150,17 @@ Verified live on the smoke treasury:
   again and `get_session` → `None`.
 - **Registry** — `register` + duplicate no-op + `treasuries_of` returning the treasury.
 
-Contract tests: `cargo test -p treasury` → **48/48** · `cargo test -p treasury_registry` → **3/3**.
+Contract tests: `cargo test -p treasury` → **51/51** · `cargo test -p treasury_registry` → **3/3** ·
+`cargo test -p compliance_verifier` → **6/6**.
+
+> **Pending — verifier hardening redeploy (coordinated).** The compliance verifier's `verify`
+> now fails closed on malformed input lengths with typed errors (`Error(Contract, #1)`
+> InvalidProofLength / `#2` InvalidPublicInputLength) instead of an opaque panic. The code is
+> merged and tested, but the **on-chain verifier is not yet redeployed**: a new `VERIFIER_ID`
+> would leave the live ZK attestation showcase (`ATTESTED_TX` in `web/src/config.ts`) empty
+> until a fresh proof is submitted, which needs the Groth16 `.zkey`. Redeploy the verifier and
+> re-run `circuits/scripts/prove-and-submit.ts` **together**, then bump `VERIFIER_ID` +
+> `ATTESTED_TX`, so the showcase stays consistent.
 
 ## Error codes
 

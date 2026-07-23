@@ -84,6 +84,33 @@ describe("pageToHead", () => {
     expect(out.events).toHaveLength(5);
   });
 
+  it("stops at head when the cursor stops advancing instead of spinning to maxPages", async () => {
+    // RPC caught up to head: empty pages whose cursor ledger == latestLedger and never moves.
+    // The old `<=` guard treated this as still-behind-head and paged to maxPages.
+    let calls = 0;
+    const out = await pageToHead(async () => {
+      calls++;
+      return page([], cursorAt(300), 300);
+    });
+    expect(calls).toBe(2); // one probe past the first page detects the stall
+    expect(out.truncated).toBe(false);
+    expect(out.events).toHaveLength(0);
+  });
+
+  it("keeps paging when a page has events even if the cursor did not advance", async () => {
+    // A non-advancing cursor is only a stall when the page is ALSO empty.
+    const pages = [
+      page([fe("a")], cursorAt(200), 300),
+      page([fe("b")], cursorAt(200), 300), // same cursor, but has events — not a stall
+      page([fe("c")], cursorAt(301), 300), // past head → stop
+    ];
+    let calls = 0;
+    const out = await pageToHead(async () => pages[calls++]);
+    expect(calls).toBe(3);
+    expect(out.events.map((e) => e.id)).toEqual(["a", "b", "c"]);
+    expect(out.truncated).toBe(false);
+  });
+
   it("makes a single call when the first page already reaches head", async () => {
     let calls = 0;
     const out = await pageToHead(async () => {
